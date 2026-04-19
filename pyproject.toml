@@ -1,0 +1,34 @@
+[project]
+name = "codex-manager"
+version = "0.1.0"
+description = "Codex account snapshot manager"
+readme = "CODEX_MANAGER_SPEC.md"
+requires-python = ">=3.10"
+dependencies = [
+    "rich>=10.0.0",
+]
+
+[project.scripts]
+codex-manager = "codex_manager.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = [
+  "-q",
+]

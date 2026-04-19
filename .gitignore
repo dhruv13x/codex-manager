@@ -1,0 +1,36 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Pytest cache
+.pytest_cache/
+
+# Local config / secrets
+.env
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+
+# Optional: ignore spec if you don't want it in repo
+# CODEX_MANAGER_SPEC.md
+
+.codex_sample/*
+geminiai_cli/*
+
