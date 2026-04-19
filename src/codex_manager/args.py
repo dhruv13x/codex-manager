@@ -177,9 +177,47 @@ def get_parser() -> argparse.ArgumentParser:
         help="Read status text from a file instead of stdin.",
     )
     status_parser.add_argument(
+        "--status-command",
+        help="Shell command that prints parseable Codex status text.",
+    )
+    status_parser.add_argument(
         "--reference-year",
         type=int,
         help="Year used when the status text omits the year in reset time.",
+    )
+    status_parser.add_argument(
+        "--codex-command",
+        default="codex --no-alt-screen",
+        help="Command used to launch Codex for live tmux capture.",
+    )
+    status_parser.add_argument(
+        "--tmux-session-name",
+        default="codexmgr_capture",
+        help="Temporary tmux session name used for live status capture.",
+    )
+    status_parser.add_argument(
+        "--tmux-cols",
+        type=int,
+        default=120,
+        help="tmux capture width for live status capture.",
+    )
+    status_parser.add_argument(
+        "--tmux-rows",
+        type=int,
+        default=40,
+        help="tmux capture height for live status capture.",
+    )
+    status_parser.add_argument(
+        "--startup-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the Codex prompt.",
+    )
+    status_parser.add_argument(
+        "--status-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the status panel.",
     )
 
     backup_parser = subparsers.add_parser(

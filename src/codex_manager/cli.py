@@ -15,7 +15,7 @@ from .prune import perform_prune, prune_result_to_text
 from .prune_backups import perform_prune_backups
 from .recommend import choose_best_account, recommendation_to_text
 from .restore import perform_restore, restore_result_to_text
-from .status import live_status_to_text, parse_live_status_text
+from .status import capture_tmux_status_text, live_status_to_text, parse_live_status_text
 from .sync import pull_backup, push_backup
 from .use_account import perform_use, use_result_to_text
 
@@ -95,8 +95,32 @@ def main() -> None:
     if args.command == "status-parse":
         if args.input_file:
             text = Path(args.input_file).read_text(encoding="utf-8")
-        else:
+        elif args.status_command:
+            import subprocess
+
+            result = subprocess.run(
+                args.status_command,
+                shell=True,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Status command failed with exit code {result.returncode}:\n{result.stderr}"
+                )
+            text = result.stdout
+        elif not sys.stdin.isatty():
             text = sys.stdin.read()
+        else:
+            text = capture_tmux_status_text(
+                session_name=args.tmux_session_name,
+                codex_command=args.codex_command,
+                cols=args.tmux_cols,
+                rows=args.tmux_rows,
+                startup_timeout_seconds=args.startup_timeout_seconds,
+                status_timeout_seconds=args.status_timeout_seconds,
+            )
         status = parse_live_status_text(text, reference_year=args.reference_year)
         print(live_status_to_text(status))
         return
