@@ -9,10 +9,16 @@ from .config import (
     DEFAULT_REFERENCE_YEAR,
     DEFAULT_SAMPLE_HOME,
     DEFAULT_SESSION_DURATION_HOURS,
+    load_config,
 )
 
 
 def get_parser() -> argparse.ArgumentParser:
+    config = load_config()
+
+    def _get_default(key: str, fallback: str | int | float | bool | None) -> str | int | float | bool | None:
+        return config.get(key, fallback)
+
     parser = argparse.ArgumentParser(prog="codex-manager")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -79,6 +85,49 @@ def get_parser() -> argparse.ArgumentParser:
         "--refresh",
         action="store_true",
         help="Regenerate inventory from source-dir before showing cooldowns.",
+    )
+    cooldown_parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Query current live account via /status and merge with stored backups.",
+    )
+    cooldown_parser.add_argument(
+        "--status-command",
+        help="Shell command that prints parseable Codex status text for --live mode.",
+    )
+    cooldown_parser.add_argument(
+        "--codex-command",
+        default="codex --no-alt-screen",
+        help="Command used to launch Codex for live tmux capture in --live mode.",
+    )
+    cooldown_parser.add_argument(
+        "--tmux-session-name",
+        default="codexmgr_capture",
+        help="Temporary tmux session name used for live status capture in --live mode.",
+    )
+    cooldown_parser.add_argument(
+        "--tmux-cols",
+        type=int,
+        default=120,
+        help="tmux capture width for live status capture in --live mode.",
+    )
+    cooldown_parser.add_argument(
+        "--tmux-rows",
+        type=int,
+        default=40,
+        help="tmux capture height for live status capture in --live mode.",
+    )
+    cooldown_parser.add_argument(
+        "--startup-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the Codex prompt in --live mode.",
+    )
+    cooldown_parser.add_argument(
+        "--status-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the status panel in --live mode.",
     )
     cooldown_parser.add_argument(
         "--limit",
@@ -209,6 +258,16 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Overwrite an existing archive if the computed name already exists.",
     )
+    backup_parser.add_argument(
+        "--auth-only",
+        action="store_true",
+        help="Only backup auth.json, config.toml, installation_id, etc. instead of the full state.",
+    )
+    backup_parser.add_argument(
+        "--prune-first",
+        action="store_true",
+        help="Run prune on runtime state before taking the backup.",
+    )
 
     restore_parser = subparsers.add_parser(
         "restore",
@@ -224,12 +283,12 @@ def get_parser() -> argparse.ArgumentParser:
     )
     restore_parser.add_argument(
         "--backup-dir",
-        default=str(DEFAULT_BACKUP_DIR),
+        default=str(_get_default("backup_dir", str(DEFAULT_BACKUP_DIR))),
         help="Directory containing backup archives and metadata.",
     )
     restore_parser.add_argument(
         "--dest-dir",
-        default=str(DEFAULT_CODEX_HOME),
+        default=str(_get_default("codex_home", str(DEFAULT_CODEX_HOME))),
         help="Codex home directory to restore into.",
     )
     restore_parser.add_argument(
@@ -249,12 +308,87 @@ def get_parser() -> argparse.ArgumentParser:
     )
     list_backups_parser.add_argument(
         "--backup-dir",
-        default=str(DEFAULT_BACKUP_DIR),
+        default=str(_get_default("backup_dir", str(DEFAULT_BACKUP_DIR))),
         help="Directory containing backup archives and metadata.",
     )
     list_backups_parser.add_argument(
         "--email",
         help="Filter backups for a specific email.",
+    )
+    list_backups_parser.add_argument(
+        "--latest-per-email",
+        action="store_true",
+        help="Only show the latest backup for each email.",
+    )
+    list_backups_parser.add_argument(
+        "--ready",
+        action="store_true",
+        help="Only show backups whose cooldown has expired.",
+    )
+    list_backups_parser.add_argument(
+        "--sort",
+        choices=["reset_at", "session_start_at", "created_at"],
+        default="created_at",
+        help="Sort backups by the specified field.",
+    )
+    list_backups_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output the list as JSON.",
+    )
+
+    prune_backups_parser = subparsers.add_parser(
+        "prune-backups",
+        help="Delete old backup archives.",
+    )
+    prune_backups_parser.add_argument(
+        "--backup-dir",
+        default=str(_get_default("backup_dir", str(DEFAULT_BACKUP_DIR))),
+        help="Directory containing backup archives and metadata.",
+    )
+    prune_backups_parser.add_argument(
+        "--keep",
+        type=int,
+        help="Number of most recent backups to keep.",
+    )
+    prune_backups_parser.add_argument(
+        "--keep-latest-per-email",
+        action="store_true",
+        help="Keep only the latest backup per email, pruning all older ones.",
+    )
+    prune_backups_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be removed without deleting anything.",
+    )
+
+    profile_parser = subparsers.add_parser(
+        "profile",
+        help="Export or import the complete codex manager profile state.",
+    )
+    profile_parser.add_argument(
+        "action",
+        choices=["export", "import"],
+        help="Action to perform: export or import.",
+    )
+    profile_parser.add_argument(
+        "file",
+        help="Path to the profile archive (.tar.gz) to export to or import from.",
+    )
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Verify dependencies, directories, and status parser.",
+    )
+    doctor_parser.add_argument(
+        "--source-dir",
+        default=str(_get_default("codex_home", str(DEFAULT_CODEX_HOME))),
+        help="Codex home directory to check.",
+    )
+    doctor_parser.add_argument(
+        "--backup-dir",
+        default=str(_get_default("backup_dir", str(DEFAULT_BACKUP_DIR))),
+        help="Directory containing backup archives and metadata to check.",
     )
 
     prune_parser = subparsers.add_parser(
@@ -263,7 +397,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     prune_parser.add_argument(
         "--source-dir",
-        default=str(DEFAULT_CODEX_HOME),
+        default=str(_get_default("codex_home", str(DEFAULT_CODEX_HOME))),
         help="Codex home directory to prune.",
     )
     prune_parser.add_argument(
@@ -286,12 +420,12 @@ def get_parser() -> argparse.ArgumentParser:
     )
     use_parser.add_argument(
         "--backup-dir",
-        default=str(DEFAULT_BACKUP_DIR),
+        default=str(_get_default("backup_dir", str(DEFAULT_BACKUP_DIR))),
         help="Directory containing backup archives and metadata.",
     )
     use_parser.add_argument(
         "--dest-dir",
-        default=str(DEFAULT_CODEX_HOME),
+        default=str(_get_default("codex_home", str(DEFAULT_CODEX_HOME))),
         help="Codex home directory to restore into.",
     )
     use_parser.add_argument(
@@ -308,6 +442,43 @@ def get_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="Reserved for future full-restore switching behavior; auth-only switching does not replace the whole destination.",
+    )
+
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Sync backups to or from an S3-compatible bucket.",
+    )
+    sync_parser.add_argument(
+        "direction",
+        choices=["push", "pull"],
+        help="Direction to sync: 'push' to upload, 'pull' to download.",
+    )
+    sync_parser.add_argument(
+        "--bucket-name",
+        required=True,
+        help="Name of the S3 bucket to sync with.",
+    )
+    sync_parser.add_argument(
+        "--endpoint-url",
+        help="S3 endpoint URL (e.g. for Backblaze B2). Defaults to AWS_ENDPOINT_URL env var.",
+    )
+    sync_parser.add_argument(
+        "--access-key",
+        help="AWS access key ID. Defaults to AWS_ACCESS_KEY_ID env var.",
+    )
+    sync_parser.add_argument(
+        "--secret-key",
+        help="AWS secret access key. Defaults to AWS_SECRET_ACCESS_KEY env var.",
+    )
+    sync_parser.add_argument(
+        "--backup-dir",
+        default=str(_get_default("backup_dir", str(DEFAULT_BACKUP_DIR))),
+        help="Directory containing backup archives and metadata.",
+    )
+    sync_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would happen without actually syncing.",
     )
 
     return parser

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from codex_manager.cooldown import evaluate_record, evaluate_records, format_remaining
+from codex_manager.cooldown import evaluate_record, evaluate_records, format_remaining, CooldownStatus
 from codex_manager.normalize import NormalizedRecord
 
 
@@ -45,6 +45,39 @@ def test_evaluate_records_sorts_ready_first() -> None:
     )
     assert statuses[0].email == "ready@example.com"
     assert statuses[1].email == "locked@example.com"
+
+
+def test_evaluate_records_merges_live_status() -> None:
+    now = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
+    record1 = NormalizedRecord(
+        email="a@example.com",
+        legacy_auth_filename="test.json",
+        legacy_quota_day_token="19apr",
+        quota_end_detected_at="2026-04-12T12:00:00+00:00",
+        session_start_at="2026-04-12T10:00:00+00:00",
+        next_available_at="2026-04-19T10:00:00+00:00",
+        inferred_session_duration_seconds=7200,
+        proposed_archive_name="2026-04-12-100000-a@example.com-codex.tar.gz",
+        validation_status="ok",
+        validation_details="ok",
+        source_path=".codex_sample/19apr_a@example.com_auth.json",
+    )
+
+    live_status = CooldownStatus(
+        email="a@example.com",
+        status="cooldown",
+        session_start_at=datetime(2026, 4, 13, 10, 0, 0, tzinfo=timezone.utc),
+        next_available_at=datetime(2026, 4, 20, 10, 0, 0, tzinfo=timezone.utc),
+        quota_end_detected_at=datetime(2026, 4, 13, 12, 0, 0, tzinfo=timezone.utc),
+        validation_status="live",
+        proposed_archive_name="2026-04-13-100000-a@example.com-codex.tar.gz",
+        remaining_seconds=1000,
+    )
+
+    statuses = evaluate_records([record1], now=now, live_status=live_status)
+    assert len(statuses) == 1
+    assert statuses[0].validation_status == "live"
+    assert statuses[0].next_available_at.day == 20
 
 
 def test_format_remaining() -> None:

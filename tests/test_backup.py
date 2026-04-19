@@ -24,6 +24,8 @@ def make_args(tmp_path: Path, source_dir: Path, status_file: Path, *, dry_run: b
         include_tmp=False,
         dry_run=dry_run,
         force=False,
+        auth_only=False,
+        prune_first=False,
     )
 
 
@@ -76,3 +78,56 @@ def test_backup_creates_archive_and_metadata(tmp_path: Path) -> None:
     assert "history.jsonl" in names
     assert "tmp/skip.txt" not in names
     assert archive_path.name.replace(".tar.gz", ".metadata.json") in names
+
+
+def test_backup_auth_only(tmp_path: Path) -> None:
+    source_dir = tmp_path / ".codex"
+    source_dir.mkdir()
+    (source_dir / "auth.json").write_text("{}", encoding="utf-8")
+    (source_dir / "config.toml").write_text("", encoding="utf-8")
+    (source_dir / "history.jsonl").write_text("line\n", encoding="utf-8")
+
+    status_file = tmp_path / "status.txt"
+    status_file.write_text(
+        "Email : test@gmail.com\n"
+        "Quota : [░] 0% left (resets 10:02 on 26 Apr)\n",
+        encoding="utf-8",
+    )
+
+    args = make_args(tmp_path, source_dir, status_file)
+    args.auth_only = True
+    archive_path, metadata_path, metadata = perform_backup(args)
+
+    assert metadata["backup_mode"] == "auth-only"
+    with tarfile.open(archive_path, "r:gz") as tar:
+        names = tar.getnames()
+    assert "auth.json" in names
+    assert "config.toml" in names
+    assert "history.jsonl" not in names
+
+
+def test_backup_prune_first(tmp_path: Path) -> None:
+    source_dir = tmp_path / ".codex"
+    source_dir.mkdir()
+    (source_dir / "auth.json").write_text("{}", encoding="utf-8")
+    (source_dir / "models_cache.json").write_text("{}", encoding="utf-8")
+
+    status_file = tmp_path / "status.txt"
+    status_file.write_text(
+        "Email : test@gmail.com\n"
+        "Quota : [░] 0% left (resets 10:02 on 26 Apr)\n",
+        encoding="utf-8",
+    )
+
+    args = make_args(tmp_path, source_dir, status_file)
+    args.prune_first = True
+    archive_path, metadata_path, metadata = perform_backup(args)
+
+    assert metadata["pruned_before_backup"] is True
+    # Verify prune was run - cache file should be deleted from source
+    assert not (source_dir / "models_cache.json").exists()
+
+    with tarfile.open(archive_path, "r:gz") as tar:
+        names = tar.getnames()
+    assert "auth.json" in names
+    assert "models_cache.json" not in names

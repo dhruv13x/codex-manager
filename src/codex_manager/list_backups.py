@@ -49,10 +49,45 @@ def list_backups(
     backup_dir: Path,
     *,
     email: str | None = None,
+    latest_per_email: bool = False,
+    ready: bool = False,
+    sort_by: str = "created_at",
 ) -> list[BackupEntry]:
     entries = [build_backup_entry(path) for path in iter_backup_archives(backup_dir)]
     if email is not None:
         entries = [entry for entry in entries if entry.email == email]
+
+    if ready:
+        from datetime import datetime
+        import codex_manager.list_backups # For mocking
+        now = getattr(codex_manager.list_backups, "datetime", datetime).now().astimezone()
+        def is_ready(entry: BackupEntry) -> bool:
+            if entry.reset_at == "unknown":
+                return False
+            try:
+                dt = getattr(codex_manager.list_backups, "datetime", datetime)
+                reset_time = dt.fromisoformat(entry.reset_at)
+                return reset_time <= now
+            except ValueError:
+                return False
+        entries = [e for e in entries if is_ready(e)]
+
+    if sort_by == "reset_at":
+        entries.sort(key=lambda e: e.reset_at, reverse=True)
+    elif sort_by == "session_start_at":
+        entries.sort(key=lambda e: e.session_start_at, reverse=True)
+    else:
+        entries.sort(key=lambda e: e.created_at, reverse=True)
+
+    if latest_per_email:
+        seen = set()
+        filtered = []
+        for e in entries:
+            if e.email not in seen:
+                seen.add(e.email)
+                filtered.append(e)
+        entries = filtered
+
     return entries
 
 
