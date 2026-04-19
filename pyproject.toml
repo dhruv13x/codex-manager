@@ -4,12 +4,32 @@ version = "0.1.0"
 description = "Codex account snapshot manager"
 readme = "CODEX_MANAGER_SPEC.md"
 requires-python = ">=3.10"
-dependencies = [
-    "rich>=10.0.0",
+license = { text = "MIT" }
+authors = [
+  { name = "Dhruv", email = "dhruv13x@gmail.com" }
 ]
+
+dependencies = [
+  "rich>=13.0.0",
+]
+
+keywords = ["codex", "backup", "cli", "automation"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Environment :: Console",
+]
+
+[project.urls]
+Homepage = "https://github.com/dhruv13x/codex-manager"
+Repository = "https://github.com/dhruv13x/codex-manager"
+Issues = "https://github.com/dhruv13x/codex-manager/issues"
 
 [project.scripts]
 codex-manager = "codex_manager.cli:main"
+cm = "codex_manager.cli:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
@@ -18,6 +38,16 @@ build-backend = "setuptools.build_meta"
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0.0",
+  "pytest-cov>=5.0.0",
+  "pytest-timeout>=2.2.0",
+  "pytest-json-report>=1.5.0",
+  "pytest-asyncio>=0.23.0",
+  "pytest-mock>=3.10.0",
+  "pyfakefs>=5.0.0",
+  "ruff>=0.6.0",
+  "black>=24.3.0",
+  "mypy>=1.11.0",
+  "types-PyYAML>=6.0",
 ]
 
 [tool.setuptools]
@@ -29,6 +59,50 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
 addopts = [
-  "-q",
+  "-v",
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--tb=short",
+  "--showlocals",
+  "--import-mode=importlib",
+  "--timeout=10",
+  "--durations=10",
+  "--cov=src/codex_manager",
+  "--cov-report=term-missing:skip-covered",
+  "--cov-report=html",
+  "--cov-report=xml",
+  "--cov-fail-under=85",
 ]
+
+asyncio_mode = "auto"
+log_cli = true
+log_cli_level = "INFO"
+
+[tool.coverage.run]
+branch = true
+source = ["src/codex_manager"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+ignore_missing_imports = true
