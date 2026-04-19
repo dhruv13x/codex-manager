@@ -1,6 +1,6 @@
 [project]
 name = "codex-manager"
-version = "0.1.0"
+version = "1.0.0"
 description = "Codex account snapshot manager"
 readme = "CODEX_MANAGER_SPEC.md"
 requires-python = ">=3.10"
