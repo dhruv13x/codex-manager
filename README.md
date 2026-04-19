@@ -15,6 +15,7 @@
 - Python 3.10+
 - Existing Codex account data (`~/.codex` or `.codex_sample`)
 
+
 ### Installation
 You can install Codex Manager directly via `pip` or using `uv` for a virtual environment.
 
