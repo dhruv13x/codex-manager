@@ -30,4 +30,4 @@ def import_profile(import_path: Path) -> None:
 
     with tarfile.open(import_path, "r:gz") as tar:
         # Extract into parent directory since the archive contains the root folder
-        tar.extractall(path=CODEX_MANAGER_HOME.parent)
+        tar.extractall(path=CODEX_MANAGER_HOME.parent, filter="data")
