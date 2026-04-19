@@ -45,8 +45,15 @@ def evaluate_record(record: NormalizedRecord, now: datetime | None = None) -> Co
 def evaluate_records(
     records: list[NormalizedRecord],
     now: datetime | None = None,
+    live_status: CooldownStatus | None = None,
 ) -> list[CooldownStatus]:
     statuses = [evaluate_record(record, now=now) for record in records]
+
+    if live_status is not None:
+        # replace any historical status for the live account
+        statuses = [s for s in statuses if s.email != live_status.email]
+        statuses.append(live_status)
+
     return sorted(
         statuses,
         key=lambda item: (
@@ -70,7 +77,7 @@ def format_remaining(seconds: int) -> str:
     return f"{minutes}m"
 
 
-def statuses_to_table(statuses: list[CooldownStatus]) -> str:
+def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> str:
     headers = [
         "Account",
         "Status",
@@ -81,9 +88,10 @@ def statuses_to_table(statuses: list[CooldownStatus]) -> str:
     ]
     rows = []
     for status in statuses:
+        account_display = f"*{status.email}" if status.email == live_email else status.email
         rows.append(
             [
-                status.email,
+                account_display,
                 status.status.upper(),
                 format_remaining(status.remaining_seconds),
                 status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),

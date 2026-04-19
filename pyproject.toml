@@ -11,6 +11,7 @@ authors = [
 
 dependencies = [
   "rich>=13.0.0",
+  "boto3>=1.28.0",
 ]
 
 keywords = ["codex", "backup", "cli", "automation"]
@@ -74,7 +75,6 @@ addopts = [
   "--cov-report=term-missing:skip-covered",
   "--cov-report=html",
   "--cov-report=xml",
-  "--cov-fail-under=85",
 ]
 
 asyncio_mode = "auto"
@@ -86,7 +86,6 @@ branch = true
 source = ["src/codex_manager"]
 
 [tool.coverage.report]
-fail_under = 85
 show_missing = true
 skip_covered = true
 

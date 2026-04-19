@@ -11,9 +11,11 @@ from pathlib import Path
 
 from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
 from .normalize import isoformat_local
+from .prune import perform_prune
 from .status import LiveStatus, capture_tmux_status_text, parse_live_status_text
 
 EXCLUDED_TOP_LEVEL_NAMES = {".tmp", "tmp"}
+AUTH_ONLY_INCLUDES = {"auth.json", "config.toml", "installation_id"}
 
 
 def read_status_text_from_args(args) -> str:
@@ -44,7 +46,14 @@ def read_status_text_from_args(args) -> str:
     )
 
 
-def build_backup_metadata(status: LiveStatus, source_dir: Path, archive_path: Path) -> dict:
+def build_backup_metadata(
+    status: LiveStatus,
+    source_dir: Path,
+    archive_path: Path,
+    *,
+    backup_mode: str = "full",
+    pruned_before_backup: bool = False,
+) -> dict:
     return {
         "product": "codex",
         "email": status.email,
@@ -58,12 +67,16 @@ def build_backup_metadata(status: LiveStatus, source_dir: Path, archive_path: Pa
         "source_codex_home": str(source_dir),
         "created_at": isoformat_local(datetime.now().astimezone()),
         "status_source": "live_codex_status",
+        "backup_mode": backup_mode,
+        "pruned_before_backup": pruned_before_backup,
     }
 
 
-def iter_source_entries(source_dir: Path, include_tmp: bool) -> list[Path]:
+def iter_source_entries(source_dir: Path, include_tmp: bool, auth_only: bool) -> list[Path]:
     entries = []
     for path in sorted(source_dir.iterdir(), key=lambda item: item.name):
+        if auth_only and path.name not in AUTH_ONLY_INCLUDES:
+            continue
         if not include_tmp and path.name in EXCLUDED_TOP_LEVEL_NAMES:
             continue
         entries.append(path)
@@ -77,6 +90,7 @@ def create_backup_archive(
     metadata: dict,
     *,
     include_tmp: bool,
+    auth_only: bool,
 ) -> None:
     archive_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -86,7 +100,7 @@ def create_backup_archive(
         temp_metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
         with tarfile.open(archive_path, "w:gz") as tar:
-            for path in iter_source_entries(source_dir, include_tmp):
+            for path in iter_source_entries(source_dir, include_tmp, auth_only):
                 tar.add(path, arcname=path.name, recursive=True)
             tar.add(temp_metadata_path, arcname=temp_metadata_path.name, recursive=False)
 
@@ -95,6 +109,13 @@ def perform_backup(args) -> tuple[Path, Path, dict]:
     source_dir = Path(args.source_dir).expanduser()
     if not source_dir.exists() or not source_dir.is_dir():
         raise FileNotFoundError(f"Source Codex directory does not exist: {source_dir}")
+
+    pruned = False
+    if getattr(args, "prune_first", False):
+        from types import SimpleNamespace
+        prune_args = SimpleNamespace(source_dir=str(source_dir), dry_run=args.dry_run)
+        perform_prune(prune_args)
+        pruned = True
 
     status_text = read_status_text_from_args(args)
     live_status = parse_live_status_text(
@@ -107,7 +128,16 @@ def perform_backup(args) -> tuple[Path, Path, dict]:
     metadata_path = backup_dir / live_status.proposed_archive_name.replace(
         ".tar.gz", ".metadata.json"
     )
-    metadata = build_backup_metadata(live_status, source_dir, archive_path)
+
+    backup_mode = "auth-only" if getattr(args, "auth_only", False) else "full"
+
+    metadata = build_backup_metadata(
+        live_status,
+        source_dir,
+        archive_path,
+        backup_mode=backup_mode,
+        pruned_before_backup=pruned,
+    )
 
     if args.dry_run:
         return archive_path, metadata_path, metadata
@@ -128,6 +158,7 @@ def perform_backup(args) -> tuple[Path, Path, dict]:
         metadata_path,
         metadata,
         include_tmp=args.include_tmp,
+        auth_only=getattr(args, "auth_only", False),
     )
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
