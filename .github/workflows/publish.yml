@@ -34,14 +34,6 @@ jobs:
       - name: "\U0001f9ea Run tests & generate coverage"
         run: pytest --cov=src --cov-report=xml
 
-      - name: "\U0001f4ca Upload coverage reports to Codecov"
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.xml
-          verbose: true
-          fail_ci_if_error: true
-
       - name: "\u2699\ufe0f Build distribution packages"
         run: python -m build
 
