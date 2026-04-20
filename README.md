@@ -63,7 +63,7 @@ Codex Manager prioritizes configuration via command-line arguments but falls bac
 
 | Variable | Description | Default | Required |
 | --- | --- | --- | --- |
-| `CODEXMGR_HOME` | Base directory for backups and inventory. | `~/.codexmgr` | No |
+| `CODEX_MANAGER_HOME` | Base directory for backups and inventory. | `~/.codex-manager` | No |
 | `AWS_ENDPOINT_URL` | S3 endpoint URL for remote backups. | None | No |
 | `AWS_ACCESS_KEY_ID` | AWS access key for cloud syncing. | None | No |
 | `AWS_SECRET_ACCESS_KEY` | AWS secret key for cloud syncing. | None | No |
@@ -73,8 +73,8 @@ Codex Manager prioritizes configuration via command-line arguments but falls bac
 | Flag | Description |
 | --- | --- |
 | `--source-dir` | Target directory for legacy files or active state (default: `~/.codex_sample` or `~/.codex`). |
-| `--inventory-path` | Output path for the normalized JSON inventory (default: `~/.codexmgr/inventory.json`). |
-| `--backup-dir` | Directory to store or retrieve `.tar.gz` snapshots (default: `~/.codexmgr/backups`). |
+| `--inventory-path` | Output path for the normalized JSON inventory (default: `~/.codex-manager/inventory.json`). |
+| `--backup-dir` | Directory to store or retrieve `.tar.gz` snapshots (default: `~/.codex-manager/backups`). |
 | `--dry-run` | Preview actions (backup, restore, use, prune) without making system changes. |
 | `--refresh` | Force an inventory regeneration from disk before running recommendations. |
 
@@ -100,9 +100,9 @@ src/codex_manager/
 ```
 
 ### Data Flow
-1. **Normalization**: `codex-manager normalize` scans `~/.codex_sample` (legacy files), infers timeframes, and writes to `~/.codexmgr/inventory.json`.
+1. **Normalization**: `codex-manager normalize` scans `~/.codex_sample` (legacy files), infers timeframes, and writes to `~/.codex-manager/inventory.json`.
 2. **Evaluation**: `codex-manager cooldown` and `recommend` read the JSON inventory, assess 7-day windows, and rank accounts.
-3. **Execution**: `codex-manager backup` archives current `~/.codex` files. `codex-manager use` replaces live files with an archive safely, maintaining backups in `~/.codexmgr/backups/`.
+3. **Execution**: `codex-manager backup` archives current `~/.codex` files. `codex-manager use` replaces live files with an archive safely, maintaining backups in `~/.codex-manager/backups/`.
 
 ---
 
@@ -110,7 +110,7 @@ src/codex_manager/
 
 | Common Error | Solution |
 | --- | --- |
-| `JSONDecodeError: Expecting value` | Check if `~/.codexmgr/config.json` is corrupted. Delete it and retry. |
+| `JSONDecodeError: Expecting value` | Check if `~/.codex-manager/config.json` is corrupted. Delete it and retry. |
 | No ready accounts found | Run `codex-manager cooldown --refresh` to ensure the inventory matches your disk files. |
 | Cannot sync to S3 | Ensure the `boto3` dependency is installed and AWS environment variables are set correctly. |
 | Tmux capture failed in --live | Increase `--startup-timeout-seconds` or check if `codex --no-alt-screen` is working. |

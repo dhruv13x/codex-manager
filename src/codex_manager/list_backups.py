@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from .restore import load_metadata_for_archive
+from .cloud import B2Provider
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,71 @@ def build_backup_entry(archive_path: Path) -> BackupEntry:
         quota_percent_left=metadata.get("quota_percent_left"),
         quota_text=metadata.get("quota_text", "unknown"),
     )
+
+def list_cloud_backups(
+    cloud: B2Provider,
+    *,
+    email: str | None = None,
+    latest_per_email: bool = False,
+    ready: bool = False,
+    sort_by: str = "created_at",
+) -> list[BackupEntry]:
+    cloud_files = cloud.list_files()
+    metadata_files = [f for f in cloud_files if f.name.endswith(".metadata.json")]
+    
+    entries = []
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        for mf in metadata_files:
+            local_mf = tmp_path / mf.name
+            try:
+                cloud.download_file(mf.name, local_mf)
+                metadata = json.loads(local_mf.read_text())
+                entries.append(BackupEntry(
+                    archive_path=Path(metadata.get("archive_name", mf.name.replace(".metadata.json", ".tar.gz"))),
+                    email=metadata.get("email", "unknown"),
+                    session_start_at=metadata.get("session_start_at", "unknown"),
+                    reset_at=metadata.get("reset_at", "unknown"),
+                    created_at=metadata.get("created_at", "unknown"),
+                    quota_percent_left=metadata.get("quota_percent_left"),
+                    quota_text=metadata.get("quota_text", "unknown"),
+                ))
+            except Exception:
+                continue
+
+    if email is not None:
+        entries = [entry for entry in entries if entry.email == email]
+
+    if ready:
+        from datetime import datetime
+        now = datetime.now().astimezone()
+        def is_ready(entry: BackupEntry) -> bool:
+            if entry.reset_at == "unknown":
+                return False
+            try:
+                reset_time = datetime.fromisoformat(entry.reset_at)
+                return reset_time <= now
+            except ValueError:
+                return False
+        entries = [e for e in entries if is_ready(e)]
+
+    if sort_by == "reset_at":
+        entries.sort(key=lambda e: e.reset_at, reverse=True)
+    elif sort_by == "session_start_at":
+        entries.sort(key=lambda e: e.session_start_at, reverse=True)
+    else:
+        entries.sort(key=lambda e: e.created_at, reverse=True)
+
+    if latest_per_email:
+        seen = set()
+        filtered = []
+        for e in entries:
+            if e.email not in seen:
+                seen.add(e.email)
+                filtered.append(e)
+        entries = filtered
+
+    return entries
 
 
 def list_backups(

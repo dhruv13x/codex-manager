@@ -43,7 +43,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     cooldown_parser.add_argument(
         "--tmux-session-name",
-        default="codexmgr_capture",
+        default="codex_manager_capture",
         help="Temporary tmux session name used for live status capture in --live mode.",
     )
     cooldown_parser.add_argument(
@@ -76,6 +76,14 @@ def get_parser() -> argparse.ArgumentParser:
         default=DEFAULT_COOLDOWN_DISPLAY_LIMIT,
         help="Maximum number of accounts to display.",
     )
+    cooldown_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Query availability from Cloud (B2) metadata.",
+    )
+    cooldown_parser.add_argument("--bucket", help="B2 Bucket Name")
+    cooldown_parser.add_argument("--b2-id", help="B2 Key ID")
+    cooldown_parser.add_argument("--b2-key", help="B2 App Key")
 
     recommend_parser = subparsers.add_parser(
         "recommend",
@@ -107,7 +115,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     recommend_parser.add_argument(
         "--tmux-session-name",
-        default="codexmgr_capture",
+        default="codex_manager_capture",
         help="Temporary tmux session name used for live status capture in --live mode.",
     )
     recommend_parser.add_argument(
@@ -134,9 +142,17 @@ def get_parser() -> argparse.ArgumentParser:
         default=20.0,
         help="Seconds to wait for the status panel in --live mode.",
     )
+    recommend_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Recommend from Cloud (B2) metadata.",
+    )
+    recommend_parser.add_argument("--bucket", help="B2 Bucket Name")
+    recommend_parser.add_argument("--b2-id", help="B2 Key ID")
+    recommend_parser.add_argument("--b2-key", help="B2 App Key")
 
     status_parser = subparsers.add_parser(
-        "status-parse",
+        "status",
         help="Parse Codex /status text or tmux helper output into exact backup metadata.",
     )
     status_parser.add_argument(
@@ -159,7 +175,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     status_parser.add_argument(
         "--tmux-session-name",
-        default="codexmgr_capture",
+        default="codex_manager_capture",
         help="Temporary tmux session name used for live status capture.",
     )
     status_parser.add_argument(
@@ -221,7 +237,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     backup_parser.add_argument(
         "--tmux-session-name",
-        default="codexmgr_capture",
+        default="codex_manager_capture",
         help="Temporary tmux session name used for live status capture.",
     )
     backup_parser.add_argument(
@@ -273,6 +289,14 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run prune on runtime state before taking the backup.",
     )
+    backup_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Create local backup AND upload to Cloud (B2).",
+    )
+    backup_parser.add_argument("--bucket", help="B2 Bucket Name")
+    backup_parser.add_argument("--b2-id", help="B2 Key ID")
+    backup_parser.add_argument("--b2-key", help="B2 App Key")
 
     restore_parser = subparsers.add_parser(
         "restore",
@@ -306,6 +330,14 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Delete an existing destination instead of moving it aside to a timestamped .bak path.",
     )
+    restore_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Restore from Cloud (B2).",
+    )
+    restore_parser.add_argument("--bucket", help="B2 Bucket Name")
+    restore_parser.add_argument("--b2-id", help="B2 Key ID")
+    restore_parser.add_argument("--b2-key", help="B2 App Key")
 
     list_backups_parser = subparsers.add_parser(
         "list-backups",
@@ -341,6 +373,14 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Output the list as JSON.",
     )
+    list_backups_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="List backups from Cloud (B2).",
+    )
+    list_backups_parser.add_argument("--bucket", help="B2 Bucket Name")
+    list_backups_parser.add_argument("--b2-id", help="B2 Key ID")
+    list_backups_parser.add_argument("--b2-key", help="B2 App Key")
 
     prune_backups_parser = subparsers.add_parser(
         "prune-backups",
@@ -448,6 +488,14 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Reserved for future full-restore switching behavior; auth-only switching does not replace the whole destination.",
     )
+    use_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Use a backup from Cloud (B2).",
+    )
+    use_parser.add_argument("--bucket", help="B2 Bucket Name")
+    use_parser.add_argument("--b2-id", help="B2 Key ID")
+    use_parser.add_argument("--b2-key", help="B2 App Key")
 
     sync_parser = subparsers.add_parser(
         "sync",

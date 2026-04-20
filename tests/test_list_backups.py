@@ -15,7 +15,7 @@ def make_backup_args(tmp_path: Path, source_dir: Path, status_file: Path):
         status_command=None,
         reference_year=2026,
         codex_command="codex --no-alt-screen",
-        tmux_session_name="codexmgr_capture",
+        tmux_session_name="codex_manager_capture",
         tmux_cols=120,
         tmux_rows=40,
         startup_timeout_seconds=20.0,

@@ -93,7 +93,7 @@ def create_backup_archive(
 ) -> None:
     archive_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="codexmgr-backup-") as temp_dir_str:
+    with tempfile.TemporaryDirectory(prefix="codex-manager-backup-") as temp_dir_str:
         temp_dir = Path(temp_dir_str)
         temp_metadata_path = temp_dir / metadata_path.name
         temp_metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")

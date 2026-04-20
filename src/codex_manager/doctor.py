@@ -3,9 +3,15 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import urllib.request
 from pathlib import Path
+from rich.console import Console
+from rich.table import Table
 
 from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
+from .cloud import get_cloud_provider
+
+console = Console()
 
 def _check_command(command: str) -> bool:
     try:
@@ -24,46 +30,82 @@ def _check_dir_writable(path: Path) -> bool:
     return os.access(path, os.W_OK)
 
 def run_doctor(codex_home: Path = DEFAULT_CODEX_HOME, backup_dir: Path = DEFAULT_BACKUP_DIR) -> None:
-    print("Codex Manager Doctor\n")
+    console.print("[bold cyan]Codex Manager Doctor[/]\n")
+
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Component", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Details", style="dim")
 
     issues = 0
 
-    print("Checking dependencies...")
-    if _check_command("tmux"):
-        print("  [OK] tmux is installed")
-    else:
-        print("  [FAIL] tmux is not found in PATH")
+    # Dependencies
+    for cmd in ["tmux", "codex"]:
+        if _check_command(cmd):
+            # Resolve path for details
+            path = subprocess.run(["which", cmd], capture_output=True, text=True).stdout.strip()
+            table.add_row(f"Tool: {cmd}", "[bold green]OK[/]", path)
+        else:
+            table.add_row(f"Tool: {cmd}", "[bold red]FAIL[/]", "Not found in PATH")
+            issues += 1
+
+    try:
+        import boto3
+        table.add_row("Lib: boto3", "[bold green]OK[/]", "Installed")
+    except ImportError:
+        table.add_row("Lib: boto3", "[bold red]FAIL[/]", "Not installed")
         issues += 1
 
-    if _check_command("codex"):
-        print("  [OK] codex is installed")
-    else:
-        print("  [FAIL] codex is not found in PATH")
+    try:
+        from b2sdk.v2 import B2Api
+        table.add_row("Lib: b2sdk", "[bold green]OK[/]", "Installed")
+    except ImportError:
+        table.add_row("Lib: b2sdk", "[bold red]FAIL[/]", "Not installed")
         issues += 1
 
-    print("\nChecking directories...")
+    # Directories
     if codex_home.exists():
-        print(f"  [OK] Codex home ({codex_home}) exists")
+        table.add_row("Dir: Codex Home", "[bold green]OK[/]", f"Exists: {codex_home}")
     else:
-        print(f"  [FAIL] Codex home ({codex_home}) does not exist")
+        table.add_row("Dir: Codex Home", "[bold red]FAIL[/]", f"Missing: {codex_home}")
         issues += 1
 
     if _check_dir_writable(backup_dir):
-        print(f"  [OK] Backup directory ({backup_dir}) is writable")
+        table.add_row("Dir: Backup Dir", "[bold green]OK[/]", f"Writable: {backup_dir}")
     else:
-        print(f"  [FAIL] Backup directory ({backup_dir}) is not writable or cannot be created")
+        table.add_row("Dir: Backup Dir", "[bold red]FAIL[/]", f"Not writable: {backup_dir}")
         issues += 1
 
-    print("\nChecking status parser...")
+    # Network
+    try:
+        urllib.request.urlopen("https://www.google.com", timeout=3)
+        table.add_row("Network", "[bold green]OK[/]", "Internet accessible")
+    except Exception:
+        table.add_row("Network", "[bold red]FAIL[/]", "No internet access")
+        issues += 1
+
+    # Cloud (B2)
+    try:
+        cp = get_cloud_provider()
+        if cp:
+            table.add_row("Cloud (B2)", "[bold green]OK[/]", f"Authenticated (Bucket: {cp.bucket_name})")
+        else:
+            table.add_row("Cloud (B2)", "[yellow]SKIPPED[/]", "Credentials not configured")
+    except Exception as e:
+        table.add_row("Cloud (B2)", "[bold red]FAIL[/]", str(e))
+        issues += 1
+
+    # Status Parser
     try:
         from .status import parse_live_status_text
         sample_status = "Email: test@example.com\nQuota: [░] 10% left (resets 10:02 on 26 Apr)"
         parse_live_status_text(sample_status)
-        print("  [OK] Status parser is functioning correctly")
+        table.add_row("Status Parser", "[bold green]OK[/]", "Functioning correctly")
     except Exception as e:
-        print(f"  [FAIL] Status parser encountered an error: {e}")
+        table.add_row("Status Parser", "[bold red]FAIL[/]", str(e))
         issues += 1
 
-    print(f"\nDoctor check complete. Found {issues} issue(s).")
+    console.print(table)
+    console.print(f"\n[bold]Doctor check complete. Found {issues} issue(s).[/]")
     if issues > 0:
         sys.exit(1)

@@ -1,48 +1,42 @@
 from __future__ import annotations
 
-import shutil
-import tarfile
-import tempfile
-from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
-from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
 from .prune import perform_prune
-from .restore import (
-    load_metadata_for_archive,
-    perform_restore,
-    resolve_archive_path,
-    validate_archive_contents,
-)
+from .restore import perform_restore
+from .recommend import choose_best_account
+from .cooldown import evaluate_records
+from .list_backups import list_backups
 
-
-def backup_existing_auth(dest_dir: Path) -> Path | None:
-    auth_path = dest_dir / "auth.json"
-    if not auth_path.exists():
-        return None
-    backup_path = dest_dir / f"auth.json.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    shutil.copy2(auth_path, backup_path)
-    return backup_path
-
-
-def install_auth_only(archive_path: Path, dest_dir: Path) -> None:
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(archive_path, "r:gz") as tar:
-        extracted = tar.extractfile("auth.json")
-        if extracted is None:
-            raise FileNotFoundError(f"Archive does not contain readable auth.json: {archive_path}")
-        with tempfile.NamedTemporaryFile(dir=dest_dir, delete=False) as tmp:
-            tmp.write(extracted.read())
-            tmp_path = Path(tmp.name)
-    tmp_path.replace(dest_dir / "auth.json")
-
-
-def perform_use(args):
+def perform_use(args: Any) -> tuple[Path, Path, dict[str, Any], Path | None, bool]:
+    """
+    High-level workflow for switching accounts.
+    If no identity (email or archive) is provided, it automatically recommends the best one.
+    """
     dest_dir = Path(args.dest_dir).expanduser()
     pruned = False
 
-    if args.clean:
+    # 1. Identity Resolution: If no email/archive, recommend the best account
+    if not args.email and not args.from_archive:
+        # We need a list of entries to recommend from
+        # Note: If this is a cloud-recommendation, cli.py should have already 
+        # populated args.from_archive or we might need to pass entries in.
+        # For now, let's assume local unless cli.py handles the download.
+        from .cli import list_entries_from_args
+        entries = list_entries_from_args(args)
+        if not entries:
+            raise ValueError("No backups available to recommend an account from.")
+        
+        # Build a temporary live status if needed? 
+        # (Simplified: just recommend from entries)
+        recommendation = choose_best_account(evaluate_records(entries))
+        print(f"Automatically recommended: {recommendation.selected.email}")
+        args.email = recommendation.selected.email
+
+    # 2. Pre-Restore: Prune if requested
+    if getattr(args, "clean", False):
         prune_args = SimpleNamespace(
             source_dir=str(dest_dir),
             dry_run=args.dry_run,
@@ -50,42 +44,21 @@ def perform_use(args):
         if dest_dir.exists():
             perform_prune(prune_args)
         pruned = True
-        restore_args = SimpleNamespace(
-            from_archive=args.from_archive,
-            email=args.email,
-            backup_dir=args.backup_dir,
-            dest_dir=args.dest_dir,
-            dry_run=args.dry_run,
-            force=False,
-        )
-        archive_path, restored_dest_dir, metadata, existing_backup_path = perform_restore(restore_args)
-        return archive_path, restored_dest_dir, metadata, existing_backup_path, pruned
 
-    restore_args = SimpleNamespace(
-        from_archive=args.from_archive,
-        email=args.email,
-        backup_dir=args.backup_dir,
-        dest_dir=args.dest_dir,
-        dry_run=args.dry_run,
-        force=args.force,
-    )
-    archive_path = resolve_archive_path(restore_args)
-    metadata = load_metadata_for_archive(archive_path)
-    validate_archive_contents(archive_path)
-    existing_backup_path = None
-
-    if not args.dry_run:
-        existing_backup_path = backup_existing_auth(dest_dir)
-        install_auth_only(archive_path, dest_dir)
-
-    return archive_path, dest_dir, metadata, existing_backup_path, pruned
-
+    # 3. Execution: Delegate to perform_restore
+    # 'use' defaults to auth-only restore unless --clean is requested.
+    if not getattr(args, "clean", False):
+        args.auth_only = True
+    
+    archive_path, restored_dest_dir, metadata, existing_backup_path = perform_restore(args)
+    
+    return archive_path, restored_dest_dir, metadata, existing_backup_path, pruned
 
 def use_result_to_text(
-    archive_path,
-    dest_dir,
-    metadata,
-    existing_backup_path,
+    archive_path: Path,
+    dest_dir: Path,
+    metadata: dict[str, Any],
+    existing_backup_path: Path | None,
     *,
     dry_run: bool,
     pruned: bool,
@@ -100,13 +73,6 @@ def use_result_to_text(
         f"reset_at: {metadata.get('reset_at', 'unknown')}",
     ]
     if existing_backup_path is not None:
-        lines.append(f"previous_destination_backup: {existing_backup_path}")
-    lines.append(
-        "behavior: "
-        + (
-            "runtime state was pruned before restore; auth/account state came from the backup"
-            if pruned
-            else "only auth/account state was swapped; runtime state such as sessions, history, caches, and sqlite files was preserved"
-        )
-    )
+        lines.append(f"safety_backup: {existing_backup_path}")
+    
     return "\n".join(lines)

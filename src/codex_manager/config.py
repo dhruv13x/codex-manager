@@ -3,11 +3,17 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-CODEX_MANAGER_HOME = Path(
-    os.path.expanduser(os.environ.get("CODEXMGR_HOME", "~/.codexmgr"))
-)
-DEFAULT_CODEX_HOME = Path(os.path.expanduser("~/.codex"))
+# Primary environment variable: CODEX_MANAGER_HOME
+# Primary directory: ~/.codex-manager
+
+_env_home = os.environ.get("CODEX_MANAGER_HOME")
+if _env_home:
+    CODEX_MANAGER_HOME = Path(os.path.expanduser(_env_home))
+else:
+    CODEX_MANAGER_HOME = Path(os.path.expanduser("~/.codex-manager"))
+
 DEFAULT_BACKUP_DIR = CODEX_MANAGER_HOME / "backups"
+DEFAULT_CODEX_HOME = Path(os.path.expanduser("~/.codex"))
 DEFAULT_COOLDOWN_DISPLAY_LIMIT = 200
 
 def load_config() -> dict[str, str | int | float | bool]:

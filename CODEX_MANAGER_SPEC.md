@@ -365,7 +365,7 @@ These are needed because the Codex side starts with a legacy auth-file naming pr
 
 Suggested manager home:
 
-`~/.codexmgr/`
+`~/.codex-manager/`
 
 Suggested subpaths:
 

@@ -7,7 +7,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
+from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME, CODEX_MANAGER_HOME
 
 
 def resolve_archive_path(args) -> Path:
@@ -67,7 +67,7 @@ def validate_archive_contents(archive_path: Path) -> None:
 
 
 def extract_archive_to_temp(archive_path: Path) -> Path:
-    temp_dir = Path(tempfile.mkdtemp(prefix="codexmgr-restore-"))
+    temp_dir = Path(tempfile.mkdtemp(prefix="codex-manager-restore-"))
     with tarfile.open(archive_path, "r:gz") as tar:
         tar.extractall(temp_dir, filter="data")
     return temp_dir
@@ -76,7 +76,11 @@ def extract_archive_to_temp(archive_path: Path) -> Path:
 def move_existing_target(dest_dir: Path) -> Path | None:
     if not dest_dir.exists():
         return None
-    backup_path = dest_dir.with_name(f"{dest_dir.name}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
+    
+    safety_dir = CODEX_MANAGER_HOME / "safety_backups"
+    safety_dir.mkdir(parents=True, exist_ok=True)
+    
+    backup_path = safety_dir / f"{dest_dir.name}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     shutil.move(str(dest_dir), str(backup_path))
     return backup_path
 
@@ -104,6 +108,23 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
     validate_archive_contents(archive_path)
 
     dest_dir = Path(args.dest_dir).expanduser()
+    
+    auth_only = getattr(args, "auth_only", False)
+    
+    if auth_only:
+        if args.dry_run:
+            return archive_path, dest_dir, metadata, None
+        
+        # Swapping just auth-related files
+        from .backup import AUTH_ONLY_INCLUDES
+        existing_backup_path = None # We don't move whole tree, maybe backup auth.json?
+        # For simplicity in 'use', we can just overwrite
+        with tarfile.open(archive_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                if member.name in AUTH_ONLY_INCLUDES:
+                    tar.extract(member, path=dest_dir, filter="data")
+        return archive_path, dest_dir, metadata, existing_backup_path
+
     extracted_dir = extract_archive_to_temp(archive_path)
     prune_metadata_file(extracted_dir)
 
@@ -140,5 +161,5 @@ def restore_result_to_text(
         f"quota_text: {metadata.get('quota_text', 'unknown')}",
     ]
     if existing_backup_path is not None:
-        lines.append(f"previous_destination_backup: {existing_backup_path}")
+        lines.append(f"safety_backup: {existing_backup_path}")
     return "\n".join(lines)

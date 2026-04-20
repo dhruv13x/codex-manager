@@ -17,6 +17,10 @@ RESET_TEXT_RE = re.compile(
     r"resets\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})\s+on\s+(?P<day>\d{1,2})\s+(?P<month>[A-Za-z]{3})",
     re.IGNORECASE,
 )
+RESET_TIME_ONLY_RE = re.compile(
+    r"resets\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})",
+    re.IGNORECASE,
+)
 PERCENT_RE = re.compile(r"(\d+)%\s+left")
 
 MONTH_LOOKUP = {
@@ -56,7 +60,7 @@ def run_command(args: Sequence[str], *, check: bool = True) -> subprocess.Comple
 
 def capture_tmux_status_text(
     *,
-    session_name: str = "codexmgr_capture",
+    session_name: str = "codex_manager_capture",
     codex_command: str = "codex --no-alt-screen",
     cols: int = 120,
     rows: int = 40,
@@ -125,21 +129,33 @@ def _extract_email_and_quota(text: str) -> tuple[str, str]:
 
 def _resolve_reset_at(quota_text: str, *, now: datetime, reference_year: int | None) -> datetime:
     match = RESET_TEXT_RE.search(quota_text)
-    if not match:
-        raise ValueError(f"Unable to parse reset time from quota text: {quota_text}")
+    if match:
+        month = MONTH_LOOKUP[match.group("month").lower()]
+        year = reference_year if reference_year is not None else now.year
+        reset_at = datetime(
+            year,
+            month,
+            int(match.group("day")),
+            int(match.group("hour")),
+            int(match.group("minute")),
+            tzinfo=now.tzinfo,
+        )
+    else:
+        match = RESET_TIME_ONLY_RE.search(quota_text)
+        if not match:
+            raise ValueError(f"Unable to parse reset time from quota text: {quota_text}")
 
-    month = MONTH_LOOKUP[match.group("month").lower()]
-    year = reference_year if reference_year is not None else now.year
-    reset_at = datetime(
-        year,
-        month,
-        int(match.group("day")),
-        int(match.group("hour")),
-        int(match.group("minute")),
-        tzinfo=now.tzinfo,
-    )
+        reset_at = datetime(
+            now.year,
+            now.month,
+            now.day,
+            int(match.group("hour")),
+            int(match.group("minute")),
+            tzinfo=now.tzinfo,
+        )
+
     if reference_year is None and reset_at < now - timedelta(days=1):
-        reset_at = reset_at.replace(year=year + 1)
+        reset_at = reset_at.replace(year=reset_at.year + 1)
     return reset_at
 
 
