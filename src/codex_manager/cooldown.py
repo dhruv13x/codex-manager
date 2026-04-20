@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from .normalize import NormalizedRecord
+from .list_backups import BackupEntry
 
 
 @dataclass(frozen=True)
@@ -22,32 +22,32 @@ def parse_iso_datetime(value: str) -> datetime:
     return datetime.fromisoformat(value)
 
 
-def evaluate_record(record: NormalizedRecord, now: datetime | None = None) -> CooldownStatus:
+def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownStatus:
     current = now.astimezone() if now is not None else datetime.now().astimezone()
-    session_start_at = parse_iso_datetime(record.session_start_at)
-    next_available_at = parse_iso_datetime(record.next_available_at)
-    quota_end_detected_at = parse_iso_datetime(record.quota_end_detected_at)
+    session_start_at = parse_iso_datetime(entry.session_start_at)
+    next_available_at = parse_iso_datetime(entry.reset_at)
+    quota_end_detected_at = parse_iso_datetime(entry.created_at)
     remaining_seconds = int((next_available_at - current).total_seconds())
     status = "ready" if remaining_seconds <= 0 else "cooldown"
 
     return CooldownStatus(
-        email=record.email,
+        email=entry.email,
         status=status,
         session_start_at=session_start_at,
         next_available_at=next_available_at,
         quota_end_detected_at=quota_end_detected_at,
-        validation_status=record.validation_status,
-        proposed_archive_name=record.proposed_archive_name,
+        validation_status="backup",
+        proposed_archive_name=entry.archive_path.name,
         remaining_seconds=max(0, remaining_seconds),
     )
 
 
 def evaluate_records(
-    records: list[NormalizedRecord],
+    entries: list[BackupEntry],
     now: datetime | None = None,
     live_status: CooldownStatus | None = None,
 ) -> list[CooldownStatus]:
-    statuses = [evaluate_record(record, now=now) for record in records]
+    statuses = [evaluate_entry(entry, now=now) for entry in entries]
 
     if live_status is not None:
         # replace any historical status for the live account
@@ -83,8 +83,8 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
         "Status",
         "Available",
         "Session Start",
-        "Quota End",
-        "Valid",
+        "Reset At",
+        "Source",
     ]
     rows = []
     for status in statuses:

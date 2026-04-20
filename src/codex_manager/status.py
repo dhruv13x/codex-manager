@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Sequence
 
-from .normalize import build_archive_name, isoformat_local
+from .utils import build_archive_name, isoformat_local
 
 STATUS_PANEL_ACCOUNT_RE = re.compile(r"Account:\s+(\S+@\S+)")
 STATUS_PANEL_WEEKLY_RE = re.compile(r"Weekly limit:\s+(.*?)(?:\n|$)", re.DOTALL)

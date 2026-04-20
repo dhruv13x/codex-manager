@@ -8,7 +8,6 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
-from .normalize import isoformat_local
 
 
 def resolve_archive_path(args) -> Path:

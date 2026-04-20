@@ -7,9 +7,7 @@ from .args import get_parser
 from .backup import backup_result_to_text, perform_backup
 from .cooldown import CooldownStatus, evaluate_records, statuses_to_table
 from .doctor import run_doctor
-from .inventory import load_inventory, write_inventory
 from .list_backups import entries_to_table, list_backups
-from .normalize import normalize_directory, records_to_json
 from .profile import export_profile, import_profile
 from .prune import perform_prune, prune_result_to_text
 from .prune_backups import perform_prune_backups
@@ -27,68 +25,41 @@ def main() -> None:
     parser = get_parser()
     args = parser.parse_args()
 
-    if args.command == "normalize":
-        records = normalize_directory(
-            Path(args.source_dir),
-            session_duration_hours=args.session_duration_hours,
-            reference_year=args.reference_year,
+    def build_live_status(args) -> CooldownStatus | None:
+        if not getattr(args, "live", False):
+            return None
+
+        from .backup import read_status_text_from_args
+        from datetime import datetime
+
+        status_text = read_status_text_from_args(args)
+        ls = parse_live_status_text(status_text, reference_year=getattr(args, "reference_year", None))
+
+        now = datetime.now().astimezone()
+        remaining_seconds = int((ls.reset_at - now).total_seconds())
+        status = "ready" if remaining_seconds <= 0 else "cooldown"
+
+        return CooldownStatus(
+            email=ls.email,
+            status=status,
+            session_start_at=ls.session_start_at,
+            next_available_at=ls.reset_at,
+            quota_end_detected_at=now,
+            validation_status="live",
+            proposed_archive_name=ls.proposed_archive_name,
+            remaining_seconds=max(0, remaining_seconds),
         )
-        if args.write_inventory:
-            write_inventory(records, Path(args.inventory_path))
-        print(records_to_json(records))
-        return
 
     if args.command == "cooldown":
-        inventory_path = Path(args.inventory_path)
-        if args.refresh or not inventory_path.exists():
-            records = normalize_directory(
-                Path(args.source_dir),
-                session_duration_hours=args.session_duration_hours,
-                reference_year=args.reference_year,
-            )
-            write_inventory(records, inventory_path)
-        else:
-            records = load_inventory(inventory_path)
-
-        live_status = None
-        if args.live:
-            from .backup import read_status_text_from_args
-            from datetime import datetime
-            status_text = read_status_text_from_args(args)
-            ls = parse_live_status_text(status_text)
-
-            now = datetime.now().astimezone()
-            remaining_seconds = int((ls.reset_at - now).total_seconds())
-            s = "ready" if remaining_seconds <= 0 else "cooldown"
-
-            live_status = CooldownStatus(
-                email=ls.email,
-                status=s,
-                session_start_at=ls.session_start_at,
-                next_available_at=ls.reset_at,
-                quota_end_detected_at=now,
-                validation_status="live",
-                proposed_archive_name=ls.proposed_archive_name,
-                remaining_seconds=max(0, remaining_seconds),
-            )
-
-        statuses = evaluate_records(records, live_status=live_status)[: args.limit]
+        entries = list_backups(Path(args.backup_dir).expanduser(), latest_per_email=True)
+        live_status = build_live_status(args)
+        statuses = evaluate_records(entries, live_status=live_status)[: args.limit]
         print(statuses_to_table(statuses, live_email=live_status.email if live_status else None))
         return
 
     if args.command == "recommend":
-        inventory_path = Path(args.inventory_path)
-        if args.refresh or not inventory_path.exists():
-            records = normalize_directory(
-                Path(args.source_dir),
-                session_duration_hours=args.session_duration_hours,
-                reference_year=args.reference_year,
-            )
-            write_inventory(records, inventory_path)
-        else:
-            records = load_inventory(inventory_path)
-
-        recommendation = choose_best_account(evaluate_records(records))
+        entries = list_backups(Path(args.backup_dir).expanduser(), latest_per_email=True)
+        recommendation = choose_best_account(evaluate_records(entries, live_status=build_live_status(args)))
         print(recommendation_to_text(recommendation))
         return
 

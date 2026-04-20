@@ -19,17 +19,17 @@ def choose_best_account(statuses: list[CooldownStatus]) -> Recommendation:
         statuses,
         key=lambda item: (
             item.status != "ready",
-            item.validation_status != "ok",
+            item.validation_status != "live",
             item.next_available_at if item.status != "ready" else item.session_start_at,
             item.email,
         ),
     )
 
     if selected.status == "ready":
-        if selected.validation_status == "ok":
-            reason = "Ready now with validated timing metadata."
+        if selected.validation_status == "live":
+            reason = "Ready now from live Codex status."
         else:
-            reason = "Ready now, but timing metadata did not validate against the legacy quota token."
+            reason = "Ready now from backup metadata."
     else:
         reason = (
             "No account is ready. This account becomes available first in "

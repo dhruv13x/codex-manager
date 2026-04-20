@@ -4,11 +4,7 @@ import argparse
 from .config import (
     DEFAULT_BACKUP_DIR,
     DEFAULT_COOLDOWN_DISPLAY_LIMIT,
-    DEFAULT_INVENTORY_PATH,
     DEFAULT_CODEX_HOME,
-    DEFAULT_REFERENCE_YEAR,
-    DEFAULT_SAMPLE_HOME,
-    DEFAULT_SESSION_DURATION_HOURS,
     load_config,
 )
 
@@ -22,69 +18,14 @@ def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codex-manager")
     subparsers = parser.add_subparsers(dest="command")
 
-    normalize_parser = subparsers.add_parser(
-        "normalize",
-        help="Normalize legacy Codex auth snapshot names into a machine-readable inventory.",
-    )
-    normalize_parser.add_argument(
-        "--source-dir",
-        default=str(DEFAULT_SAMPLE_HOME),
-        help="Directory containing legacy *_auth.json files.",
-    )
-    normalize_parser.add_argument(
-        "--session-duration-hours",
-        type=float,
-        default=DEFAULT_SESSION_DURATION_HOURS,
-        help="Hours to subtract from auth file mtime to infer session start.",
-    )
-    normalize_parser.add_argument(
-        "--reference-year",
-        type=int,
-        default=DEFAULT_REFERENCE_YEAR,
-        help="Year used when expanding legacy day-month tokens such as 21apr.",
-    )
-    normalize_parser.add_argument(
-        "--write-inventory",
-        action="store_true",
-        help="Write the normalized inventory to disk.",
-    )
-    normalize_parser.add_argument(
-        "--inventory-path",
-        default=str(DEFAULT_INVENTORY_PATH),
-        help="Path to write the normalized inventory JSON.",
-    )
-    normalize_parser.set_defaults(write_inventory=True)
-
     cooldown_parser = subparsers.add_parser(
         "cooldown",
-        help="Show weekly availability from normalized inventory records.",
+        help="Show weekly availability from backup metadata, optionally merged with live Codex status.",
     )
     cooldown_parser.add_argument(
-        "--inventory-path",
-        default=str(DEFAULT_INVENTORY_PATH),
-        help="Path to the normalized inventory JSON.",
-    )
-    cooldown_parser.add_argument(
-        "--source-dir",
-        default=str(DEFAULT_SAMPLE_HOME),
-        help="Directory containing legacy *_auth.json files when refreshing inventory.",
-    )
-    cooldown_parser.add_argument(
-        "--session-duration-hours",
-        type=float,
-        default=DEFAULT_SESSION_DURATION_HOURS,
-        help="Hours to subtract from auth file mtime to infer session start.",
-    )
-    cooldown_parser.add_argument(
-        "--reference-year",
-        type=int,
-        default=DEFAULT_REFERENCE_YEAR,
-        help="Year used when expanding legacy day-month tokens such as 21apr.",
-    )
-    cooldown_parser.add_argument(
-        "--refresh",
-        action="store_true",
-        help="Regenerate inventory from source-dir before showing cooldowns.",
+        "--backup-dir",
+        default=str(DEFAULT_BACKUP_DIR),
+        help="Directory containing backup archives and metadata.",
     )
     cooldown_parser.add_argument(
         "--live",
@@ -138,34 +79,60 @@ def get_parser() -> argparse.ArgumentParser:
 
     recommend_parser = subparsers.add_parser(
         "recommend",
-        help="Recommend the best account to use next from normalized inventory records.",
+        help="Recommend the best account to use next from backup metadata, optionally merged with live Codex status.",
     )
     recommend_parser.add_argument(
-        "--inventory-path",
-        default=str(DEFAULT_INVENTORY_PATH),
-        help="Path to the normalized inventory JSON.",
+        "--backup-dir",
+        default=str(DEFAULT_BACKUP_DIR),
+        help="Directory containing backup archives and metadata.",
     )
     recommend_parser.add_argument(
-        "--source-dir",
-        default=str(DEFAULT_SAMPLE_HOME),
-        help="Directory containing legacy *_auth.json files when refreshing inventory.",
+        "--live",
+        action="store_true",
+        help="Query current live account via /status and merge with stored backups.",
     )
     recommend_parser.add_argument(
-        "--session-duration-hours",
-        type=float,
-        default=DEFAULT_SESSION_DURATION_HOURS,
-        help="Hours to subtract from auth file mtime to infer session start.",
+        "--status-command",
+        help="Shell command that prints parseable Codex status text for --live mode.",
     )
     recommend_parser.add_argument(
         "--reference-year",
         type=int,
-        default=DEFAULT_REFERENCE_YEAR,
-        help="Year used when expanding legacy day-month tokens such as 21apr.",
+        help="Year used when the status text omits the year in reset time.",
     )
     recommend_parser.add_argument(
-        "--refresh",
-        action="store_true",
-        help="Regenerate inventory from source-dir before recommending an account.",
+        "--codex-command",
+        default="codex --no-alt-screen",
+        help="Command used to launch Codex for live tmux capture in --live mode.",
+    )
+    recommend_parser.add_argument(
+        "--tmux-session-name",
+        default="codexmgr_capture",
+        help="Temporary tmux session name used for live status capture in --live mode.",
+    )
+    recommend_parser.add_argument(
+        "--tmux-cols",
+        type=int,
+        default=120,
+        help="tmux capture width for live status capture in --live mode.",
+    )
+    recommend_parser.add_argument(
+        "--tmux-rows",
+        type=int,
+        default=40,
+        help="tmux capture height for live status capture in --live mode.",
+    )
+    recommend_parser.add_argument(
+        "--startup-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the Codex prompt in --live mode.",
+    )
+    recommend_parser.add_argument(
+        "--status-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the status panel in --live mode.",
     )
 
     status_parser = subparsers.add_parser(

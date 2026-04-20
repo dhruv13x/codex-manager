@@ -1,44 +1,41 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
-from codex_manager.cooldown import evaluate_record, evaluate_records, format_remaining, CooldownStatus
-from codex_manager.normalize import NormalizedRecord
+from codex_manager.cooldown import CooldownStatus, evaluate_entry, evaluate_records, format_remaining
+from codex_manager.list_backups import BackupEntry
 
 
-def make_record(next_available_at: str, email: str = "a@example.com") -> NormalizedRecord:
-    return NormalizedRecord(
+def make_entry(reset_at: str, email: str = "a@example.com") -> BackupEntry:
+    return BackupEntry(
+        archive_path=Path(f"/tmp/{email}.tar.gz"),
         email=email,
-        legacy_auth_filename="21apr_a@example.com_auth.json",
-        legacy_quota_day_token="21apr",
-        quota_end_detected_at="2026-04-14T17:55:00+00:00",
         session_start_at="2026-04-14T15:55:00+00:00",
-        next_available_at=next_available_at,
-        inferred_session_duration_seconds=7200,
-        proposed_archive_name=f"2026-04-14-155500-{email}-codex.tar.gz",
-        validation_status="ok",
-        validation_details="ok",
-        source_path=".codex_sample/21apr_a@example.com_auth.json",
+        reset_at=reset_at,
+        created_at="2026-04-14T17:55:00+00:00",
+        quota_percent_left=0,
+        quota_text="[####] 0% left",
     )
 
 
 def test_evaluate_record_ready() -> None:
-    record = make_record("2026-04-20T15:55:00+00:00")
-    status = evaluate_record(record, now=datetime(2026, 4, 21, 16, 0, tzinfo=timezone.utc))
+    entry = make_entry("2026-04-20T15:55:00+00:00")
+    status = evaluate_entry(entry, now=datetime(2026, 4, 21, 16, 0, tzinfo=timezone.utc))
     assert status.status == "ready"
     assert status.remaining_seconds == 0
 
 
 def test_evaluate_record_cooldown() -> None:
-    record = make_record("2026-04-21T18:00:00+00:00")
-    status = evaluate_record(record, now=datetime(2026, 4, 21, 16, 0, tzinfo=timezone.utc))
+    entry = make_entry("2026-04-21T18:00:00+00:00")
+    status = evaluate_entry(entry, now=datetime(2026, 4, 21, 16, 0, tzinfo=timezone.utc))
     assert status.status == "cooldown"
     assert status.remaining_seconds == 7200
 
 
 def test_evaluate_records_sorts_ready_first() -> None:
-    ready = make_record("2026-04-20T15:55:00+00:00", email="ready@example.com")
-    locked = make_record("2026-04-22T15:55:00+00:00", email="locked@example.com")
+    ready = make_entry("2026-04-20T15:55:00+00:00", email="ready@example.com")
+    locked = make_entry("2026-04-22T15:55:00+00:00", email="locked@example.com")
     statuses = evaluate_records(
         [locked, ready],
         now=datetime(2026, 4, 21, 16, 0, tzinfo=timezone.utc),
@@ -49,18 +46,14 @@ def test_evaluate_records_sorts_ready_first() -> None:
 
 def test_evaluate_records_merges_live_status() -> None:
     now = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
-    record1 = NormalizedRecord(
+    entry1 = BackupEntry(
+        archive_path=Path("/tmp/a@example.com.tar.gz"),
         email="a@example.com",
-        legacy_auth_filename="test.json",
-        legacy_quota_day_token="19apr",
-        quota_end_detected_at="2026-04-12T12:00:00+00:00",
         session_start_at="2026-04-12T10:00:00+00:00",
-        next_available_at="2026-04-19T10:00:00+00:00",
-        inferred_session_duration_seconds=7200,
-        proposed_archive_name="2026-04-12-100000-a@example.com-codex.tar.gz",
-        validation_status="ok",
-        validation_details="ok",
-        source_path=".codex_sample/19apr_a@example.com_auth.json",
+        reset_at="2026-04-19T10:00:00+00:00",
+        created_at="2026-04-12T12:00:00+00:00",
+        quota_percent_left=0,
+        quota_text="[####] 0% left",
     )
 
     live_status = CooldownStatus(
@@ -74,7 +67,7 @@ def test_evaluate_records_merges_live_status() -> None:
         remaining_seconds=1000,
     )
 
-    statuses = evaluate_records([record1], now=now, live_status=live_status)
+    statuses = evaluate_records([entry1], now=now, live_status=live_status)
     assert len(statuses) == 1
     assert statuses[0].validation_status == "live"
     assert statuses[0].next_available_at.day == 20
