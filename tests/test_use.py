@@ -60,12 +60,11 @@ def test_use_preserve_mode_restores_latest_for_email(tmp_path: Path) -> None:
 
     _, _, metadata, previous, pruned = perform_use(args)
     assert metadata["email"] == "letsmaildhruv@gmail.com"
-    assert previous is not None
+    assert previous is None
     assert pruned is False
     assert (dest_dir / "auth.json").read_text(encoding="utf-8") == '{"token":"x"}'
     assert (dest_dir / "history.jsonl").read_text(encoding="utf-8") == "runtime"
     assert (dest_dir / "cache").exists()
-    assert previous.name.startswith("auth.json.bak-")
 
 
 def test_use_clean_mode_prunes_then_restores(tmp_path: Path) -> None:

@@ -4,11 +4,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
-from .prune import perform_prune
-from .restore import perform_restore
-from .recommend import choose_best_account
 from .cooldown import evaluate_records
-from .list_backups import list_backups
+from .prune import perform_prune
+from .recommend import choose_best_account
+from .restore import perform_restore
+
 
 def perform_use(args: Any) -> tuple[Path, Path, dict[str, Any], Path | None, bool]:
     """

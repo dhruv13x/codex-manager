@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sys
 import tempfile
-import json
+from pathlib import Path
 from typing import Any
 
 from .args import get_parser
@@ -11,12 +10,12 @@ from .backup import backup_result_to_text, perform_backup
 from .cloud import get_cloud_provider
 from .cooldown import CooldownStatus, evaluate_records, statuses_to_table
 from .doctor import run_doctor
-from .list_backups import entries_to_table, list_backups, list_cloud_backups, BackupEntry
+from .list_backups import BackupEntry, entries_to_table, list_backups, list_cloud_backups
 from .profile import export_profile, import_profile
 from .prune import perform_prune, prune_result_to_text
 from .prune_backups import perform_prune_backups
 from .recommend import choose_best_account, recommendation_to_text
-from .restore import perform_restore, restore_result_to_text, validate_archive_contents
+from .restore import perform_restore, restore_result_to_text
 from .status import capture_tmux_status_text, live_status_to_text, parse_live_status_text
 from .sync import pull_backup, push_backup
 from .use_account import perform_use, use_result_to_text
@@ -103,8 +102,9 @@ def main() -> None:
         if not getattr(args, "live", False):
             return None
 
-        from .backup import read_status_text_from_args
         from datetime import datetime
+
+        from .backup import read_status_text_from_args
 
         status_text = read_status_text_from_args(args)
         ls = parse_live_status_text(status_text, reference_year=getattr(args, "reference_year", None))

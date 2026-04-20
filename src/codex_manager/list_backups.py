@@ -5,8 +5,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from .restore import load_metadata_for_archive
 from .cloud import B2Provider
+from .restore import load_metadata_for_archive
 
 
 @dataclass(frozen=True)
@@ -126,7 +126,8 @@ def list_backups(
 
     if ready:
         from datetime import datetime
-        import codex_manager.list_backups # For mocking
+
+        import codex_manager.list_backups  # For mocking
         now = getattr(codex_manager.list_backups, "datetime", datetime).now().astimezone()
         def is_ready(entry: BackupEntry) -> bool:
             if entry.reset_at == "unknown":
@@ -175,7 +176,7 @@ def entries_to_table(entries: list[BackupEntry]) -> str:
         )
         rows.append(
             [
-                entry.archive_path.name,
+                entry.archive_path.name if hasattr(entry, "archive_path") else getattr(entry, "proposed_archive_name", getattr(entry, "archive_name", "unknown")),
                 entry.email,
                 entry.session_start_at,
                 entry.reset_at,
@@ -186,10 +187,10 @@ def entries_to_table(entries: list[BackupEntry]) -> str:
     widths = [len(header) for header in headers]
     for row in rows:
         for index, cell in enumerate(row):
-            widths[index] = max(widths[index], len(cell))
+            widths[index] = max(widths[index], len(str(cell)))
 
     def format_row(values: list[str]) -> str:
-        return "  ".join(value.ljust(widths[index]) for index, value in enumerate(values))
+        return "  ".join(str(value).ljust(widths[index]) for index, value in enumerate(values))
 
     lines = [format_row(headers), format_row(["-" * width for width in widths])]
     lines.extend(format_row(row) for row in rows)

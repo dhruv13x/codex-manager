@@ -4,8 +4,6 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from .config import DEFAULT_CODEX_HOME
-
 FILE_GLOBS = [
     "state_5.sqlite*",
     "logs_*",

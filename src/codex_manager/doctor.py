@@ -5,11 +5,12 @@ import subprocess
 import sys
 import urllib.request
 from pathlib import Path
+
 from rich.console import Console
 from rich.table import Table
 
-from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
 from .cloud import get_cloud_provider
+from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
 
 console = Console()
 
@@ -50,14 +51,16 @@ def run_doctor(codex_home: Path = DEFAULT_CODEX_HOME, backup_dir: Path = DEFAULT
             issues += 1
 
     try:
-        import boto3
+        import importlib.util
+        importlib.util.find_spec("boto3")
         table.add_row("Lib: boto3", "[bold green]OK[/]", "Installed")
     except ImportError:
         table.add_row("Lib: boto3", "[bold red]FAIL[/]", "Not installed")
         issues += 1
 
     try:
-        from b2sdk.v2 import B2Api
+        import importlib.util
+        importlib.util.find_spec("b2sdk")
         table.add_row("Lib: b2sdk", "[bold green]OK[/]", "Installed")
     except ImportError:
         table.add_row("Lib: b2sdk", "[bold red]FAIL[/]", "Not installed")

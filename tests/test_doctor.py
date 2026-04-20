@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -60,8 +59,10 @@ def test_run_doctor_with_issues(mocker, tmp_path: Path, capsys) -> None:
 
     captured = capsys.readouterr()
     assert "Found 5 issue(s)" in captured.out
-    assert "[FAIL] tmux is not found" in captured.out
-    assert "[FAIL] codex is not found" in captured.out
-    assert "[FAIL] Codex home" in captured.out
-    assert "[FAIL] Backup directory" in captured.out
-    assert "[FAIL] Status parser encountered an error" in captured.out
+    assert "FAIL" in captured.out
+    assert "Not found in PATH" in captured.out
+
+    assert "Dir: Codex Home" in captured.out
+    assert "Dir: Backup Dir" in captured.out
+    assert "Status Parser" in captured.out
+    assert "parse error" in captured.out
