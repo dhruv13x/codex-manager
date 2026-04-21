@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 FILE_GLOBS = [
     "state_5.sqlite*",
@@ -64,15 +65,26 @@ def perform_prune(args) -> PrunePlan:
     return plan
 
 
-def prune_result_to_text(plan: PrunePlan, *, dry_run: bool, source_dir: Path | None = None) -> str:
-    lines = [
-        f"mode: {'dry-run' if dry_run else 'pruned'}",
-    ]
-    if source_dir is not None:
-        lines.append(f"source_dir: {source_dir}")
-    lines.append(f"files_removed: {len(plan.files)}")
-    lines.extend(f"file: {path}" for path in plan.files)
-    lines.append(f"directories_removed: {len(plan.directories)}")
-    lines.extend(f"dir: {path}" for path in plan.directories)
-    lines.append("preserved: auth.json, config.toml, installation_id, version.json, current auth/account state")
-    return "\n".join(lines)
+def prune_result_to_text(plan: PrunePlan, *, dry_run: bool, source_dir: Path | None = None) -> Any:
+    from .rich_utils import create_table
+
+    headers = ["Type", "Path"]
+    rows = []
+
+    mode = f"[bold yellow]{'dry-run'}[/]" if dry_run else "[bold green]pruned[/]"
+
+    rows.append(["Mode", mode])
+    if source_dir:
+        rows.append(["Source Dir", str(source_dir)])
+
+    rows.append(["Files Removed", str(len(plan.files))])
+    for path in plan.files:
+        rows.append(["File", str(path)])
+
+    rows.append(["Directories Removed", str(len(plan.directories))])
+    for path in plan.directories:
+        rows.append(["Dir", str(path)])
+
+    rows.append(["Preserved", "auth.json, config.toml, installation_id, version.json, current auth/account state"])
+
+    return create_table(title="Prune Result", headers=headers, rows=rows)

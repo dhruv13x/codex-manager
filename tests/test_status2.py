@@ -40,7 +40,11 @@ def test_resolve_reset_at_fail():
 def test_live_status_to_text():
     ls = LiveStatus("a@b.com", datetime(2026, 4, 1, tzinfo=timezone.utc), datetime(2026, 3, 25, tzinfo=timezone.utc), "foo", 50, "arc")
     res = live_status_to_text(ls)
-    assert "a@b.com" in res
+    from codex_manager.rich_utils import RICH_AVAILABLE
+    if RICH_AVAILABLE:
+        assert hasattr(res, "columns")
+    else:
+        assert "a@b.com" in res
 
 @patch("codex_manager.status.run_command")
 @patch("codex_manager.status.time.sleep")

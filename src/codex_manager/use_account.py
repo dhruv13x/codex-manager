@@ -62,17 +62,20 @@ def use_result_to_text(
     *,
     dry_run: bool,
     pruned: bool,
-) -> str:
-    lines = [
-        f"mode: {'dry-run' if dry_run else 'used'}",
-        f"clean_state: {'yes' if pruned else 'no'}",
-        f"archive: {archive_path}",
-        f"destination: {dest_dir}",
-        f"email: {metadata.get('email', 'unknown')}",
-        f"session_start_at: {metadata.get('session_start_at', 'unknown')}",
-        f"reset_at: {metadata.get('reset_at', 'unknown')}",
+) -> Any:
+    from .rich_utils import create_table
+
+    headers = ["Field", "Value"]
+    rows = [
+        ["Mode", f"[bold yellow]{'dry-run'}[/]" if dry_run else "[bold green]used[/]"],
+        ["Clean State", "yes" if pruned else "no"],
+        ["Archive", str(archive_path)],
+        ["Destination", str(dest_dir)],
+        ["Email", metadata.get("email", "unknown")],
+        ["Session Start", metadata.get("session_start_at", "unknown")],
+        ["Reset At", metadata.get("reset_at", "unknown")],
     ]
-    if existing_backup_path is not None:
-        lines.append(f"safety_backup: {existing_backup_path}")
-    
-    return "\n".join(lines)
+    if existing_backup_path:
+        rows.append(["Safety Backup", str(existing_backup_path)])
+
+    return create_table(title="Account Switched Successfully", headers=headers, rows=rows)

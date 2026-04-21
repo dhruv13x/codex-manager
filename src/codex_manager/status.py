@@ -6,6 +6,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from .utils import build_archive_name, isoformat_local
 
@@ -182,15 +183,15 @@ def parse_live_status_text(
     )
 
 
-def live_status_to_text(status: LiveStatus) -> str:
-    lines = [
-        f"email: {status.email}",
-        f"reset_at: {status.reset_at.strftime('%Y-%m-%d %H:%M:%S %z')}",
-        f"session_start_at: {status.session_start_at.strftime('%Y-%m-%d %H:%M:%S %z')}",
-        f"quota_text: {status.quota_text}",
-        f"quota_percent_left: {status.quota_percent_left if status.quota_percent_left is not None else 'unknown'}",
-        f"archive_name: {status.proposed_archive_name}",
-        f"reset_at_iso: {isoformat_local(status.reset_at)}",
-        f"session_start_at_iso: {isoformat_local(status.session_start_at)}",
+def live_status_to_text(status: LiveStatus) -> Any:
+    from .rich_utils import create_table
+
+    headers = ["Field", "Value"]
+    rows = [
+        ["Email", status.email],
+        ["Session Start", status.session_start_at.strftime("%Y-%m-%d %H:%M:%S %z")],
+        ["Reset At", status.reset_at.strftime("%Y-%m-%d %H:%M:%S %z")],
+        ["Quota % Left", f"{status.quota_percent_left}%" if status.quota_percent_left is not None else "unknown"],
+        ["Quota Text", status.quota_text],
     ]
-    return "\n".join(lines)
+    return create_table(title="Live Status", headers=headers, rows=rows)

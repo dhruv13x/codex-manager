@@ -4,6 +4,7 @@ import json
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .cloud import B2Provider
 from .restore import load_metadata_for_archive
@@ -159,7 +160,9 @@ def list_backups(
     return entries
 
 
-def entries_to_table(entries: list[BackupEntry]) -> str:
+def entries_to_table(entries: list[BackupEntry]) -> Any:
+    from .rich_utils import create_table
+
     headers = [
         "Archive",
         "Email",
@@ -184,14 +187,4 @@ def entries_to_table(entries: list[BackupEntry]) -> str:
             ]
         )
 
-    widths = [len(header) for header in headers]
-    for row in rows:
-        for index, cell in enumerate(row):
-            widths[index] = max(widths[index], len(str(cell)))
-
-    def format_row(values: list[str]) -> str:
-        return "  ".join(str(value).ljust(widths[index]) for index, value in enumerate(values))
-
-    lines = [format_row(headers), format_row(["-" * width for width in widths])]
-    lines.extend(format_row(row) for row in rows)
-    return "\n".join(lines)
+    return create_table(title="Backup Inventory", headers=headers, rows=rows)

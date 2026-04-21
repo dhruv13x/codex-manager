@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from .list_backups import BackupEntry
 
@@ -77,7 +78,9 @@ def format_remaining(seconds: int) -> str:
     return f"{minutes}m"
 
 
-def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> str:
+def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> Any:
+    from .rich_utils import create_table, get_status_style
+
     headers = [
         "Account",
         "Status",
@@ -89,10 +92,18 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
     rows = []
     for status in statuses:
         account_display = f"*{status.email}" if status.email == live_email else status.email
+
+        status_text = status.status.upper()
+        style = get_status_style(status.status)
+        if style:
+            status_text = f"[{style}]{status_text}[/]"
+        if status.email == live_email:
+            account_display = f"[bold green]{account_display}[/]"
+
         rows.append(
             [
                 account_display,
-                status.status.upper(),
+                status_text,
                 format_remaining(status.remaining_seconds),
                 status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
                 status.quota_end_detected_at.strftime("%Y-%m-%d %H:%M:%S"),
@@ -100,14 +111,4 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
             ]
         )
 
-    widths = [len(header) for header in headers]
-    for row in rows:
-        for index, cell in enumerate(row):
-            widths[index] = max(widths[index], len(cell))
-
-    def format_row(values: list[str]) -> str:
-        return "  ".join(value.ljust(widths[index]) for index, value in enumerate(values))
-
-    lines = [format_row(headers), format_row(["-" * width for width in widths])]
-    lines.extend(format_row(row) for row in rows)
-    return "\n".join(lines)
+    return create_table(title="Cooldown Status", headers=headers, rows=rows)

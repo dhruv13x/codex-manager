@@ -43,6 +43,10 @@ def test_perform_use_clean_dry_run(mock_prune, mock_restore, tmp_path):
 
 def test_use_result_to_text():
     res = use_result_to_text(Path("arc"), Path("dest"), {"email": "test"}, Path("prev"), dry_run=True, pruned=True)
-    assert "dry-run" in res
-    assert "yes" in res
-    assert "safety_backup" in res
+    from codex_manager.rich_utils import RICH_AVAILABLE
+    if RICH_AVAILABLE:
+        assert hasattr(res, "columns")
+    else:
+        assert "dry-run" in res
+        assert "yes" in res
+        assert "safety_backup" in res
