@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .cloud import get_cloud_provider
 from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
-from .ui import Table, console
+from .ui import Panel, Table, console
 
 
 def _check_command(command: str) -> bool:
@@ -28,10 +28,8 @@ def _check_dir_writable(path: Path) -> bool:
     return os.access(path, os.W_OK)
 
 def run_doctor(codex_home: Path = DEFAULT_CODEX_HOME, backup_dir: Path = DEFAULT_BACKUP_DIR) -> None:
-    console.print("[bold cyan]Codex Manager Doctor[/]\n")
-
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("Component", style="cyan")
+    table = Table(show_header=True, header_style="bold bright_magenta")
+    table.add_column("Component", style="bright_cyan")
     table.add_column("Status", justify="center")
     table.add_column("Details", style="dim")
 
@@ -105,7 +103,10 @@ def run_doctor(codex_home: Path = DEFAULT_CODEX_HOME, backup_dir: Path = DEFAULT
         table.add_row("Status Parser", "[bold red]FAIL[/]", str(e))
         issues += 1
 
-    console.print(table)
-    console.print(f"\n[bold]Doctor check complete. Found {issues} issue(s).[/]")
+    console.print(Panel(table, title="[bold bright_cyan]Codex Manager Doctor[/]", border_style="bright_cyan", expand=False))
+
     if issues > 0:
+        console.print(f"\n[bold red]Doctor check complete. Found {issues} issue(s).[/]")
         sys.exit(1)
+    else:
+        console.print("\n[bold green]Doctor check complete. No issues found![/]")

@@ -5,6 +5,8 @@ import sys
 
 try:
     from rich.console import Console as RichConsole
+    from rich.panel import Panel
+    from rich.status import Status
     from rich.table import Table
 
     class Console:
@@ -18,8 +20,43 @@ try:
             else:
                 self._stdout_console.print(*objects, **kwargs)
 
+        def status(self, status: str, **kwargs) -> Status:
+            return self._stdout_console.status(status, **kwargs)
+
     console = Console()
 except ImportError:
+
+    class DummyStatus:
+        def __init__(self, message: str):
+            self.message = message
+
+        def __enter__(self):
+            print(f"{self.message}...")
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    class Panel:
+        def __init__(self, renderable, title=None, expand=True, **kwargs):
+            self.renderable = renderable
+            self.title = title
+
+        def render(self) -> str:
+            lines = []
+            if self.title:
+                lines.append(f"--- {self.title} ---")
+            else:
+                lines.append("-------------")
+
+            # Very basic string conversion
+            if hasattr(self.renderable, "render"):
+                lines.append(self.renderable.render())
+            else:
+                lines.append(str(self.renderable))
+
+            lines.append("-------------")
+            return "\n".join(lines)
 
     class Table:
         def __init__(self, show_header=True, header_style=None):
@@ -72,12 +109,15 @@ except ImportError:
         def __init__(self):
             pass
 
+        def status(self, status: str, **kwargs):
+            return DummyStatus(re.sub(r'\[/?[a-zA-Z\s]+\]', '', status))
+
         def print(self, *objects, sep=" ", end="\n", file=None, style=None, stderr=False, markup=True, **kwargs):
             out_file = sys.stderr if stderr else (file or sys.stdout)
 
             clean_objects = []
             for obj in objects:
-                if isinstance(obj, Table):
+                if isinstance(obj, Table) or isinstance(obj, Panel):
                     clean_objects.append(obj.render())
                 elif isinstance(obj, str):
                     if markup:

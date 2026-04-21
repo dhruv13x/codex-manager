@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from .ui import console
-from rich.table import Table
-from rich.panel import Panel
 
 from .config import (
     DEFAULT_BACKUP_DIR,
@@ -12,6 +9,8 @@ from .config import (
     DEFAULT_COOLDOWN_DISPLAY_LIMIT,
     load_config,
 )
+from .ui import Panel, Table, console
+
 
 class RichHelpParser(argparse.ArgumentParser):
     """Custom parser that overrides print_help to display a Rich-based help screen."""
@@ -23,12 +22,12 @@ class RichHelpParser(argparse.ArgumentParser):
 
     def print_help(self, file=None):
         # Header
-        console.print(Panel(f"[bold cyan]Codex Manager[/]\n[italic]Account snapshot and quota manager for OpenAI Codex[/]", expand=False))
+        console.print(Panel("[bold bright_cyan]Codex Manager[/]\n[italic bright_green]Account snapshot and quota manager for OpenAI Codex[/]", expand=False, border_style="bright_cyan"))
         
-        console.print(f"\n[bold white]Usage:[/ ] [dim]{self.format_usage().strip().replace('usage: ', '')}[/]")
+        console.print(f"\n[bold bright_white]Usage:[/ ] [dim]{self.format_usage().strip().replace('usage: ', '')}[/]")
 
         if self.description:
-            console.print(f"\n[italic]{self.description}[/]")
+            console.print(f"\n[italic bright_white]{self.description}[/]")
 
         # Subcommands or Arguments
         # We can detect if we have subparsers
@@ -38,7 +37,7 @@ class RichHelpParser(argparse.ArgumentParser):
         ]
         
         if subparsers_actions:
-            console.print("\n[bold magenta]Available Commands:[/ ]")
+            console.print("\n[bold bright_magenta]Available Commands:[/ ]")
             table = Table(show_header=False, box=None, padding=(0, 2))
             for action in subparsers_actions:
                 # _SubParsersAction stores choices in a dict where values are the parsers
@@ -51,7 +50,7 @@ class RichHelpParser(argparse.ArgumentParser):
                             if sp_action.dest == choice:
                                 help_text = sp_action.help
                                 break
-                    table.add_row(f"[bold green]{choice}[/]", f"[dim]{help_text}[/]")
+                    table.add_row(f"[bold bright_green]{choice}[/]", f"[dim]{help_text}[/]")
             console.print(table)
         
         # Regular arguments
@@ -68,7 +67,7 @@ class RichHelpParser(argparse.ArgumentParser):
             if group.title == "options" and len(group._group_actions) <= 1: # just help
                 continue
 
-            console.print(f"\n[bold yellow]{group.title.capitalize()}:[/ ]")
+            console.print(f"\n[bold bright_yellow]{group.title.capitalize()}:[/ ]")
             table = Table(show_header=False, box=None, padding=(0, 2))
             for action in group._group_actions:
                 opts = ", ".join(action.option_strings) if action.option_strings else action.dest
@@ -79,7 +78,7 @@ class RichHelpParser(argparse.ArgumentParser):
                     if isinstance(action.default, (str, int, float, bool)):
                          help_text += f" [dim](default: {action.default})[/]"
 
-                table.add_row(f"[bold cyan]{opts}[/]", f"[white]{help_text}[/]")
+                table.add_row(f"[bold bright_cyan]{opts}[/]", f"[white]{help_text}[/]")
             console.print(table)
 
         console.print("\n[dim]Run 'cm <command> --help' for more information on a specific command.[/]")

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import subprocess
-import pytest
 from pathlib import Path
-from unittest.mock import MagicMock
+
+import pytest
+
 from codex_manager.doctor import _check_command, _check_dir_writable, run_doctor
+
 
 def test_check_command(mocker) -> None:
     mock_run = mocker.patch("subprocess.run")
@@ -46,7 +48,7 @@ def test_run_doctor_all_ok(mocker, tmp_path: Path, capsys) -> None:
     assert "Codex Manager Doctor" in captured.out
     assert "tmux" in captured.out
     assert "OK" in captured.out
-    assert "Doctor check complete. Found 0 issue(s)." in captured.out
+    assert "Doctor check complete. No issues found!" in captured.out
 
 def test_run_doctor_with_issues(mocker, tmp_path: Path, capsys) -> None:
     mocker.patch("codex_manager.doctor._check_command", return_value=False)

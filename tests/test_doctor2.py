@@ -29,7 +29,7 @@ def test_run_doctor_ok_with_cloud(mock_cp, mock_run, mock_writable, mock_cmd, tm
 
         out = capsys.readouterr().out
         assert "Authenticated (Bucket: test_bucket)" in out
-        assert "Found 0 issue(s)" in out
+        assert "Doctor check complete. No issues found!" in out
 
 @patch("codex_manager.doctor._check_command")
 @patch("codex_manager.doctor._check_dir_writable")

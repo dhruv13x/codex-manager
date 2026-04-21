@@ -160,14 +160,14 @@ def list_backups(
 
 
 def print_entries_table(entries: list[BackupEntry]) -> None:
-    from .ui import Table, console
+    from .ui import Panel, Table, console
 
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("Archive", style="cyan")
-    table.add_column("Email", style="green")
-    table.add_column("Session Start", justify="right")
-    table.add_column("Reset At", justify="right")
-    table.add_column("Quota", justify="right")
+    table = Table(show_header=True, header_style="bold bright_magenta")
+    table.add_column("Archive", style="bright_cyan")
+    table.add_column("Email", style="bright_green")
+    table.add_column("Session Start", justify="right", style="dim")
+    table.add_column("Reset At", justify="right", style="dim")
+    table.add_column("Quota", justify="right", style="bright_yellow")
 
     for entry in entries:
         quota = (
@@ -184,7 +184,7 @@ def print_entries_table(entries: list[BackupEntry]) -> None:
             quota,
         )
 
-    console.print(table)
+    console.print(Panel(table, title="[bold bright_cyan]Available Backups[/]", border_style="bright_cyan", expand=False))
 
 
 def entries_to_table(entries: list[BackupEntry]) -> str:
