@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import tarfile
 import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
 from .prune import perform_prune
 from .status import LiveStatus, capture_tmux_status_text, parse_live_status_text
 from .utils import isoformat_local

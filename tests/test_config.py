@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from codex_manager.config import CODEX_MANAGER_HOME, load_config
+from codex_manager.config import load_config
 
 
 def test_load_config_no_file(mocker, tmp_path: Path) -> None:

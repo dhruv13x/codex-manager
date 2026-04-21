@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from collections import defaultdict
 
-from .config import DEFAULT_BACKUP_DIR
-from .list_backups import iter_backup_archives, build_backup_entry
+from .list_backups import build_backup_entry, iter_backup_archives
+
 
 def perform_prune_backups(
     backup_dir: Path,

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import os
 import sys
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 try:
-    from b2sdk.v2 import InMemoryAccountInfo, B2Api
+    from b2sdk.v2 import B2Api, InMemoryAccountInfo
 except ImportError:
     B2Api = None
 
 from .credentials import resolve_b2_credentials
+
 
 class CloudFile:
     def __init__(self, name: str, size: int, last_modified: float):

@@ -7,7 +7,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME, CODEX_MANAGER_HOME
+from .config import CODEX_MANAGER_HOME
 
 
 def resolve_archive_path(args) -> Path:

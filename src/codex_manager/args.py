@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import argparse
+
 from .config import (
     DEFAULT_BACKUP_DIR,
-    DEFAULT_COOLDOWN_DISPLAY_LIMIT,
     DEFAULT_CODEX_HOME,
+    DEFAULT_COOLDOWN_DISPLAY_LIMIT,
     load_config,
 )
 

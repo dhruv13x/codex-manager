@@ -6,8 +6,6 @@ from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
 
-from .config import DEFAULT_BACKUP_DIR
-
 
 def _get_s3_client(endpoint_url: str | None, access_key: str | None, secret_key: str | None) -> boto3.client:
     # use env vars if not passed

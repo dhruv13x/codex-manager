@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 import subprocess
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Sequence
 
 from .utils import build_archive_name, isoformat_local
 

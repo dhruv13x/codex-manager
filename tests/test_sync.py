@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, call
-
-import pytest
-from botocore.exceptions import ClientError
+from unittest.mock import MagicMock
 
 from codex_manager.sync import _get_s3_client, pull_backup, push_backup
 

@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import os
-import requests
-from typing import Any
 from pathlib import Path
+from typing import Any
+
+import requests
+
 
 def load_env_file(path: str | Path) -> dict[str, str]:
     if not os.path.exists(path):
         return {}
     env = {}
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
