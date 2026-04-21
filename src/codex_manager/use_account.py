@@ -62,7 +62,34 @@ def use_result_to_text(
     *,
     dry_run: bool,
     pruned: bool,
-) -> str:
+) -> str | object:
+    try:
+        from rich.panel import Panel
+        from rich.text import Text
+
+        t = Text()
+        mode_color = "yellow" if dry_run else "green"
+        t.append("mode: ", style="bold")
+        t.append(f"{'dry-run' if dry_run else 'used'}\n", style=mode_color)
+        t.append("clean_state: ", style="bold")
+        t.append(f"{'yes' if pruned else 'no'}\n")
+        t.append("archive: ", style="bold")
+        t.append(f"{archive_path}\n", style="cyan")
+        t.append("destination: ", style="bold")
+        t.append(f"{dest_dir}\n", style="cyan")
+        t.append("email: ", style="bold")
+        t.append(f"{metadata.get('email', 'unknown')}\n", style="green")
+        t.append("session_start_at: ", style="bold")
+        t.append(f"{metadata.get('session_start_at', 'unknown')}\n")
+        t.append("reset_at: ", style="bold")
+        t.append(f"{metadata.get('reset_at', 'unknown')}\n")
+        if existing_backup_path is not None:
+            t.append("safety_backup: ", style="bold")
+            t.append(f"{existing_backup_path}")
+        return Panel(t, title="Use Result", border_style="blue")
+    except ImportError:
+        pass
+
     lines = [
         f"mode: {'dry-run' if dry_run else 'used'}",
         f"clean_state: {'yes' if pruned else 'no'}",

@@ -72,5 +72,14 @@ def test_move_existing_target_none(tmp_path):
 
 def test_restore_result_to_text():
     res = restore_result_to_text(Path("a"), Path("b"), {"email": "c", "session_start_at": "d", "reset_at": "e", "quota_text": "f"}, Path("g"), dry_run=True)
-    assert "dry-run" in res
-    assert "safety_backup" in res
+    try:
+        import io
+
+        from rich.console import Console
+        console = Console(file=io.StringIO(), force_terminal=False)
+        console.print(res)
+        res_str = console.file.getvalue()
+    except ImportError:
+        res_str = str(res)
+    assert "dry-run" in res_str
+    assert "backed_up_existing_to" in res_str

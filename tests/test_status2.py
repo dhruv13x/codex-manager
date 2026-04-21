@@ -40,7 +40,16 @@ def test_resolve_reset_at_fail():
 def test_live_status_to_text():
     ls = LiveStatus("a@b.com", datetime(2026, 4, 1, tzinfo=timezone.utc), datetime(2026, 3, 25, tzinfo=timezone.utc), "foo", 50, "arc")
     res = live_status_to_text(ls)
-    assert "a@b.com" in res
+    try:
+        import io
+
+        from rich.console import Console
+        console = Console(file=io.StringIO(), force_terminal=False)
+        console.print(res)
+        res_str = console.file.getvalue()
+    except ImportError:
+        res_str = str(res)
+    assert "a@b.com" in res_str
 
 @patch("codex_manager.status.run_command")
 @patch("codex_manager.status.time.sleep")

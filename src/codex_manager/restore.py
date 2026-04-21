@@ -150,7 +150,28 @@ def restore_result_to_text(
     existing_backup_path: Path | None,
     *,
     dry_run: bool,
-) -> str:
+) -> str | object:
+    try:
+        from rich.panel import Panel
+        from rich.text import Text
+
+        t = Text()
+        mode_color = "yellow" if dry_run else "green"
+        t.append("mode: ", style="bold")
+        t.append(f"{'dry-run' if dry_run else 'restored'}\n", style=mode_color)
+        t.append("archive: ", style="bold")
+        t.append(f"{archive_path}\n", style="cyan")
+        t.append("dest_dir: ", style="bold")
+        t.append(f"{dest_dir}\n", style="cyan")
+        t.append("email: ", style="bold")
+        t.append(f"{metadata.get('email', 'unknown')}\n", style="green")
+        if existing_backup_path:
+            t.append("backed_up_existing_to: ", style="bold")
+            t.append(f"{existing_backup_path}")
+        return Panel(t, title="Restore Result", border_style="blue")
+    except ImportError:
+        pass
+
     lines = [
         f"mode: {'dry-run' if dry_run else 'restored'}",
         f"archive: {archive_path}",

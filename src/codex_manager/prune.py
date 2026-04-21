@@ -64,7 +64,36 @@ def perform_prune(args) -> PrunePlan:
     return plan
 
 
-def prune_result_to_text(plan: PrunePlan, *, dry_run: bool, source_dir: Path | None = None) -> str:
+def prune_result_to_text(plan: PrunePlan, *, dry_run: bool, source_dir: Path | None = None) -> str | object:
+    try:
+        from rich.panel import Panel
+        from rich.text import Text
+
+        t = Text()
+        mode_color = "yellow" if dry_run else "green"
+        t.append("mode: ", style="bold")
+        t.append(f"{'dry-run' if dry_run else 'pruned'}\n", style=mode_color)
+        if source_dir is not None:
+            t.append("source_dir: ", style="bold")
+            t.append(f"{source_dir}\n", style="cyan")
+
+        t.append("files_removed: ", style="bold")
+        t.append(f"{len(plan.files)}\n")
+        for path in plan.files:
+            t.append(f"  file: {path}\n", style="dim")
+
+        t.append("directories_removed: ", style="bold")
+        t.append(f"{len(plan.directories)}\n")
+        for path in plan.directories:
+            t.append(f"  dir: {path}\n", style="dim")
+
+        t.append("preserved: ", style="bold")
+        t.append("auth.json, config.toml, installation_id, version.json, current auth/account state")
+
+        return Panel(t, title="Prune Result", border_style="blue")
+    except ImportError:
+        pass
+
     lines = [
         f"mode: {'dry-run' if dry_run else 'pruned'}",
     ]

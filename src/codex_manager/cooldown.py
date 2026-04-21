@@ -77,7 +77,42 @@ def format_remaining(seconds: int) -> str:
     return f"{minutes}m"
 
 
-def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> str:
+def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> str | object:
+    try:
+        from rich.table import Table
+        from rich.text import Text
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Account")
+        table.add_column("Status", justify="center")
+        table.add_column("Available", justify="right")
+        table.add_column("Session Start")
+        table.add_column("Reset At")
+        table.add_column("Source", style="dim")
+
+        for status in statuses:
+            account_text = Text()
+            if status.email == live_email:
+                account_text.append("*", style="bold green")
+                account_text.append(status.email, style="bold green")
+            else:
+                account_text.append(status.email)
+
+            status_style = "bold green" if status.status.lower() == "ready" else "bold yellow"
+            status_text = Text(status.status.upper(), style=status_style)
+
+            table.add_row(
+                account_text,
+                status_text,
+                format_remaining(status.remaining_seconds),
+                status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
+                status.quota_end_detected_at.strftime("%Y-%m-%d %H:%M:%S"),
+                status.validation_status,
+            )
+        return table
+    except ImportError:
+        pass
+
     headers = [
         "Account",
         "Status",

@@ -182,7 +182,32 @@ def parse_live_status_text(
     )
 
 
-def live_status_to_text(status: LiveStatus) -> str:
+def live_status_to_text(status: LiveStatus) -> str | object:
+    try:
+        from rich.panel import Panel
+        from rich.text import Text
+
+        t = Text()
+        t.append("email: ", style="bold")
+        t.append(f"{status.email}\n", style="green")
+        t.append("reset_at: ", style="bold")
+        t.append(f"{status.reset_at.strftime('%Y-%m-%d %H:%M:%S %z')}\n")
+        t.append("session_start_at: ", style="bold")
+        t.append(f"{status.session_start_at.strftime('%Y-%m-%d %H:%M:%S %z')}\n")
+        t.append("quota_text: ", style="bold")
+        t.append(f"{status.quota_text}\n")
+        t.append("quota_percent_left: ", style="bold")
+        t.append(f"{status.quota_percent_left if status.quota_percent_left is not None else 'unknown'}\n")
+        t.append("archive_name: ", style="bold")
+        t.append(f"{status.proposed_archive_name}\n", style="cyan")
+        t.append("reset_at_iso: ", style="bold")
+        t.append(f"{isoformat_local(status.reset_at)}\n")
+        t.append("session_start_at_iso: ", style="bold")
+        t.append(f"{isoformat_local(status.session_start_at)}")
+        return Panel(t, title="Live Status", border_style="blue")
+    except ImportError:
+        pass
+
     lines = [
         f"email: {status.email}",
         f"reset_at: {status.reset_at.strftime('%Y-%m-%d %H:%M:%S %z')}",

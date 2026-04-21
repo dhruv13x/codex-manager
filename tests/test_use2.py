@@ -43,6 +43,15 @@ def test_perform_use_clean_dry_run(mock_prune, mock_restore, tmp_path):
 
 def test_use_result_to_text():
     res = use_result_to_text(Path("arc"), Path("dest"), {"email": "test"}, Path("prev"), dry_run=True, pruned=True)
-    assert "dry-run" in res
-    assert "yes" in res
-    assert "safety_backup" in res
+    try:
+        import io
+
+        from rich.console import Console
+        console = Console(file=io.StringIO(), force_terminal=False)
+        console.print(res)
+        res_str = console.file.getvalue()
+    except ImportError:
+        res_str = str(res)
+    assert "dry-run" in res_str
+    assert "yes" in res_str
+    assert "safety_backup" in res_str or "backed_up_existing_to" in res_str
