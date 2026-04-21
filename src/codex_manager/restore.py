@@ -117,8 +117,16 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
         
         # Swapping just auth-related files
         from .backup import AUTH_ONLY_INCLUDES
-        existing_backup_path = None # We don't move whole tree, maybe backup auth.json?
-        # For simplicity in 'use', we can just overwrite
+        
+        # Backup auth.json if it exists
+        auth_path = dest_dir / "auth.json"
+        existing_backup_path = None
+        if auth_path.exists():
+            safety_dir = CODEX_MANAGER_HOME / "safety_backups"
+            safety_dir.mkdir(parents=True, exist_ok=True)
+            existing_backup_path = safety_dir / f"auth.json.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            shutil.copy2(auth_path, existing_backup_path)
+        
         with tarfile.open(archive_path, "r:gz") as tar:
             for member in tar.getmembers():
                 if member.name in AUTH_ONLY_INCLUDES:

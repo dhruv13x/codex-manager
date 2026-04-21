@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from .ui import console
+from rich.table import Table
+from rich.panel import Panel
 
 from .config import (
     DEFAULT_BACKUP_DIR,
@@ -9,6 +13,76 @@ from .config import (
     load_config,
 )
 
+class RichHelpParser(argparse.ArgumentParser):
+    """Custom parser that overrides print_help to display a Rich-based help screen."""
+
+    def error(self, message):
+        console.print(f"[bold red]Error:[/ ] {message}", stderr=True)
+        console.print("[dim]Use --help for usage information.[/]", stderr=True)
+        sys.exit(2)
+
+    def print_help(self, file=None):
+        # Header
+        console.print(Panel(f"[bold cyan]Codex Manager[/]\n[italic]Account snapshot and quota manager for OpenAI Codex[/]", expand=False))
+        
+        console.print(f"\n[bold white]Usage:[/ ] [dim]{self.format_usage().strip().replace('usage: ', '')}[/]")
+
+        if self.description:
+            console.print(f"\n[italic]{self.description}[/]")
+
+        # Subcommands or Arguments
+        # We can detect if we have subparsers
+        subparsers_actions = [
+            action for action in self._actions 
+            if isinstance(action, argparse._SubParsersAction)
+        ]
+        
+        if subparsers_actions:
+            console.print("\n[bold magenta]Available Commands:[/ ]")
+            table = Table(show_header=False, box=None, padding=(0, 2))
+            for action in subparsers_actions:
+                # _SubParsersAction stores choices in a dict where values are the parsers
+                for choice, subparser in action.choices.items():
+                    # The help for the choice is stored in the subparser's description or a special attribute
+                    help_text = getattr(subparser, 'help', '')
+                    if not help_text:
+                        # Search for the action that created this choice
+                        for sp_action in action._choices_actions:
+                            if sp_action.dest == choice:
+                                help_text = sp_action.help
+                                break
+                    table.add_row(f"[bold green]{choice}[/]", f"[dim]{help_text}[/]")
+            console.print(table)
+        
+        # Regular arguments
+        action_groups = [
+            group for group in self._action_groups 
+            if group.title != 'positional arguments' or not subparsers_actions
+        ]
+
+        for group in action_groups:
+            if not group._group_actions:
+                continue
+            
+            # Skip empty or boring groups
+            if group.title == "options" and len(group._group_actions) <= 1: # just help
+                continue
+
+            console.print(f"\n[bold yellow]{group.title.capitalize()}:[/ ]")
+            table = Table(show_header=False, box=None, padding=(0, 2))
+            for action in group._group_actions:
+                opts = ", ".join(action.option_strings) if action.option_strings else action.dest
+                help_text = action.help if action.help else ""
+                # Replace default values in help text for better look
+                if action.default and action.default != argparse.SUPPRESS and "[default:" not in help_text:
+                    # Only add if it's a simple type
+                    if isinstance(action.default, (str, int, float, bool)):
+                         help_text += f" [dim](default: {action.default})[/]"
+
+                table.add_row(f"[bold cyan]{opts}[/]", f"[white]{help_text}[/]")
+            console.print(table)
+
+        console.print("\n[dim]Run 'cm <command> --help' for more information on a specific command.[/]")
 
 def get_parser() -> argparse.ArgumentParser:
     config = load_config()
@@ -16,7 +90,7 @@ def get_parser() -> argparse.ArgumentParser:
     def _get_default(key: str, fallback: str | int | float | bool | None) -> str | int | float | bool | None:
         return config.get(key, fallback)
 
-    parser = argparse.ArgumentParser(prog="codex-manager")
+    parser = RichHelpParser(prog="codex-manager", description="Manage your Codex account snapshots and quotas.")
     subparsers = parser.add_subparsers(dest="command")
 
     cooldown_parser = subparsers.add_parser(
