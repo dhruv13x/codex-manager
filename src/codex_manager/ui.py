@@ -6,6 +6,7 @@ import sys
 try:
     from rich.console import Console as RichConsole
     from rich.table import Table
+    from rich.panel import Panel
 
     class Console:
         def __init__(self):
@@ -17,6 +18,9 @@ try:
                 self._stderr_console.print(*objects, **kwargs)
             else:
                 self._stdout_console.print(*objects, **kwargs)
+
+        def status(self, status, **kwargs):
+            return self._stdout_console.status(status, **kwargs)
 
     console = Console()
 except ImportError:
@@ -67,6 +71,20 @@ except ImportError:
 
             return "\n".join(lines)
 
+    class Panel:
+        def __init__(self, renderable, title=None, title_align=None, border_style=None, expand=True):
+            self.renderable = renderable
+            self.title = title
+
+        def render(self) -> str:
+            content = self.renderable.render() if hasattr(self.renderable, "render") else str(self.renderable)
+            title_str = f"--- {self.title} ---" if self.title else ""
+            clean_title = re.sub(r'\[.*?\]', '', title_str)
+            clean_content = re.sub(r'\[.*?\]', '', content)
+            return f"{clean_title}\n{clean_content}" if clean_title else clean_content
+
+        def __str__(self):
+            return self.render()
 
     class Console:
         def __init__(self):
@@ -77,7 +95,7 @@ except ImportError:
 
             clean_objects = []
             for obj in objects:
-                if isinstance(obj, Table):
+                if isinstance(obj, Table) or isinstance(obj, Panel):
                     clean_objects.append(obj.render())
                 elif isinstance(obj, str):
                     if markup:
@@ -90,5 +108,23 @@ except ImportError:
                     clean_objects.append(str(obj))
 
             print(*clean_objects, sep=sep, end=end, file=out_file)
+
+        def status(self, status, **kwargs):
+            class DummyStatus:
+                def __init__(self, msg, console):
+                    self.msg = msg
+                    self.console = console
+
+                def __enter__(self):
+                    self.console.print(self.msg + " ...")
+                    return self
+
+                def __exit__(self, exc_type, exc_val, exc_tb):
+                    pass
+
+                def update(self, status, **kwargs):
+                    self.console.print(status + " ...")
+
+            return DummyStatus(status, self)
 
     console = Console()
