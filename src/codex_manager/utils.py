@@ -4,7 +4,9 @@ from datetime import datetime
 
 
 def isoformat_local(dt: datetime) -> str:
-    return dt.astimezone().isoformat(timespec="seconds")
+    if dt.tzinfo is None:
+        return dt.astimezone().isoformat(timespec="seconds")
+    return dt.isoformat(timespec="seconds")
 
 
 def build_archive_name(session_start_at: datetime, email: str) -> str:
