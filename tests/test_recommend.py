@@ -53,7 +53,10 @@ def test_choose_best_account_prefers_ready_and_live_first() -> None:
     assert recommendation.selected.email == "live@example.com"
 
 
-def test_choose_best_account_uses_earliest_unlock_when_none_ready() -> None:
+from unittest.mock import patch
+
+@patch("codex_manager.registry.load_registry", return_value={})
+def test_choose_best_account_uses_earliest_unlock_when_none_ready(mock_reg) -> None:
     statuses = evaluate_records(
         [
             make_record(

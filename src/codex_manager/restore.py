@@ -43,20 +43,27 @@ def metadata_path_for_archive(archive_path: Path) -> Path:
 def load_metadata_for_archive(archive_path: Path) -> dict:
     metadata_path = metadata_path_for_archive(archive_path)
     if metadata_path.exists():
-        return json.loads(metadata_path.read_text(encoding="utf-8"))
-
-    with tarfile.open(archive_path, "r:gz") as tar:
-        member_name = archive_path.name.replace(".tar.gz", ".metadata.json")
         try:
-            member = tar.getmember(member_name)
-        except KeyError as exc:
-            raise FileNotFoundError(
-                f"Metadata file not found beside archive or inside archive: {member_name}"
-            ) from exc
-        extracted = tar.extractfile(member)
-        if extracted is None:
-            raise FileNotFoundError(f"Failed to extract metadata member: {member_name}")
-        return json.loads(extracted.read().decode("utf-8"))
+            return json.loads(metadata_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    import zlib
+    try:
+        with tarfile.open(archive_path, "r:gz") as tar:
+            member_name = archive_path.name.replace(".tar.gz", ".metadata.json")
+            try:
+                member = tar.getmember(member_name)
+            except KeyError as exc:
+                raise FileNotFoundError(
+                    f"Metadata file not found beside archive or inside archive: {member_name}"
+                ) from exc
+            extracted = tar.extractfile(member)
+            if extracted is None:
+                raise FileNotFoundError(f"Failed to extract metadata member: {member_name}")
+            return json.loads(extracted.read().decode("utf-8"))
+    except (zlib.error, tarfile.TarError) as exc:
+        raise RuntimeError(f"Could not read metadata from archive (possibly corrupted): {exc}")
 
 
 def validate_archive_contents(archive_path: Path) -> None:
@@ -86,15 +93,15 @@ def move_existing_target(dest_dir: Path) -> Path | None:
 
 
 def install_restored_tree(extracted_dir: Path, dest_dir: Path) -> None:
-    temp_install_dir = dest_dir.with_name(f".{dest_dir.name}.restore-{datetime.now().strftime('%Y%m%d-%H%M%S')}")
-    if temp_install_dir.exists():
-        shutil.rmtree(temp_install_dir)
-    shutil.move(str(extracted_dir), str(temp_install_dir))
-    os_replace(temp_install_dir, dest_dir)
-
-
-def os_replace(src: Path, dest: Path) -> None:
-    src.replace(dest)
+    # Use shutil.move because it handles cross-filesystem moves correctly.
+    # We move the entire tree from the temporary extraction point to the final destination.
+    if dest_dir.exists():
+        if dest_dir.is_dir():
+            shutil.rmtree(dest_dir)
+        else:
+            dest_dir.unlink()
+    
+    shutil.move(str(extracted_dir), str(dest_dir))
 
 
 def prune_metadata_file(extracted_dir: Path) -> None:
@@ -115,6 +122,9 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
         if args.dry_run:
             return archive_path, dest_dir, metadata, None
         
+        # Ensure destination directory exists for auth-only extraction
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
         # Swapping just auth-related files
         from .backup import AUTH_ONLY_INCLUDES
         

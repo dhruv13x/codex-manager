@@ -18,7 +18,10 @@ def test_read_status_text_from_args_command(tmp_path):
     assert read_status_text_from_args(args).strip() == "status"
 
 def test_read_status_text_from_args_command_fail(tmp_path):
-    args = SimpleNamespace(status_file=None, status_command="exit 1")
+    args = SimpleNamespace(
+        status_file=None,
+        status_command="python3 -c 'import sys; sys.exit(1)'",
+    )
     with pytest.raises(RuntimeError):
         read_status_text_from_args(args)
 

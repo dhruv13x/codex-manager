@@ -117,7 +117,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     cooldown_parser.add_argument(
         "--tmux-session-name",
-        default="codex_manager_capture",
+        default=None,
         help="Temporary tmux session name used for live status capture in --live mode.",
     )
     cooldown_parser.add_argument(
@@ -189,7 +189,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     recommend_parser.add_argument(
         "--tmux-session-name",
-        default="codex_manager_capture",
+        default=None,
         help="Temporary tmux session name used for live status capture in --live mode.",
     )
     recommend_parser.add_argument(
@@ -230,6 +230,11 @@ def get_parser() -> argparse.ArgumentParser:
         help="Parse Codex /status text or tmux helper output into exact backup metadata.",
     )
     status_parser.add_argument(
+        "--backup-dir",
+        default=str(DEFAULT_BACKUP_DIR),
+        help="Directory containing backup archives and metadata.",
+    )
+    status_parser.add_argument(
         "--input-file",
         help="Read status text from a file instead of stdin.",
     )
@@ -249,7 +254,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     status_parser.add_argument(
         "--tmux-session-name",
-        default="codex_manager_capture",
+        default=None,
         help="Temporary tmux session name used for live status capture.",
     )
     status_parser.add_argument(
@@ -276,6 +281,14 @@ def get_parser() -> argparse.ArgumentParser:
         default=20.0,
         help="Seconds to wait for the status panel.",
     )
+    status_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Update status metadata in Cloud (B2) as well.",
+    )
+    status_parser.add_argument("--bucket", help="B2 Bucket Name")
+    status_parser.add_argument("--b2-id", help="B2 Key ID")
+    status_parser.add_argument("--b2-key", help="B2 App Key")
 
     backup_parser = subparsers.add_parser(
         "backup",
@@ -311,7 +324,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     backup_parser.add_argument(
         "--tmux-session-name",
-        default="codex_manager_capture",
+        default=None,
         help="Temporary tmux session name used for live status capture.",
     )
     backup_parser.add_argument(
@@ -337,6 +350,11 @@ def get_parser() -> argparse.ArgumentParser:
         type=float,
         default=20.0,
         help="Seconds to wait for the status panel.",
+    )
+    backup_parser.add_argument(
+        "--without-status-check",
+        action="store_true",
+        help="Skip live status capture and use current time minus 7 days for cooldown calculation.",
     )
     backup_parser.add_argument(
         "--include-tmp",
@@ -374,7 +392,7 @@ def get_parser() -> argparse.ArgumentParser:
 
     restore_parser = subparsers.add_parser(
         "restore",
-        help="Restore a Codex backup archive into a target Codex home directory.",
+        help="Full State Recovery: Restore an entire Codex environment (Auth + History + Logs) from a backup.",
     )
     restore_parser.add_argument(
         "--from-archive",
@@ -395,6 +413,54 @@ def get_parser() -> argparse.ArgumentParser:
         help="Codex home directory to restore into.",
     )
     restore_parser.add_argument(
+        "--status-command",
+        help="Shell command that prints parseable Codex status text.",
+    )
+    restore_parser.add_argument(
+        "--reference-year",
+        type=int,
+        help="Year used when the status text omits the year in reset time.",
+    )
+    restore_parser.add_argument(
+        "--codex-command",
+        default="codex --no-alt-screen",
+        help="Command used to launch Codex for live tmux capture.",
+    )
+    restore_parser.add_argument(
+        "--tmux-session-name",
+        default=None,
+        help="Temporary tmux session name used for live status capture.",
+    )
+    restore_parser.add_argument(
+        "--tmux-cols",
+        type=int,
+        default=120,
+        help="tmux capture width for live status capture.",
+    )
+    restore_parser.add_argument(
+        "--tmux-rows",
+        type=int,
+        default=40,
+        help="tmux capture height for live status capture.",
+    )
+    restore_parser.add_argument(
+        "--startup-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the Codex prompt.",
+    )
+    restore_parser.add_argument(
+        "--status-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the status panel.",
+    )
+    restore_parser.add_argument(
+        "--without-status-check",
+        action="store_true",
+        help="Skip current account status capture before restore.",
+    )
+    restore_parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate and stage the restore without changing the destination.",
@@ -402,7 +468,12 @@ def get_parser() -> argparse.ArgumentParser:
     restore_parser.add_argument(
         "--force",
         action="store_true",
-        help="Delete an existing destination instead of moving it aside to a timestamped .bak path.",
+        help="Delete an existing destination instead of moving it aside to a safety backup.",
+    )
+    restore_parser.add_argument(
+        "--auth-only",
+        action="store_true",
+        help="Identity Only: Only restore auth.json and config files, preserving current session history/logs.",
     )
     restore_parser.add_argument(
         "--cloud",
@@ -527,7 +598,7 @@ def get_parser() -> argparse.ArgumentParser:
 
     use_parser = subparsers.add_parser(
         "use",
-        help="Switch to a backed-up account. Default is auth-only; --clean performs a clean-state restore.",
+        help="Quick Switcher: Log into a backed-up account. Defaults to Auth-Only (preserves current history).",
     )
     use_parser.add_argument(
         "--from-archive",
@@ -546,6 +617,54 @@ def get_parser() -> argparse.ArgumentParser:
         "--dest-dir",
         default=str(_get_default("codex_home", str(DEFAULT_CODEX_HOME))),
         help="Codex home directory to restore into.",
+    )
+    use_parser.add_argument(
+        "--status-command",
+        help="Shell command that prints parseable Codex status text.",
+    )
+    use_parser.add_argument(
+        "--reference-year",
+        type=int,
+        help="Year used when the status text omits the year in reset time.",
+    )
+    use_parser.add_argument(
+        "--codex-command",
+        default="codex --no-alt-screen",
+        help="Command used to launch Codex for live tmux capture.",
+    )
+    use_parser.add_argument(
+        "--tmux-session-name",
+        default=None,
+        help="Temporary tmux session name used for live status capture.",
+    )
+    use_parser.add_argument(
+        "--tmux-cols",
+        type=int,
+        default=120,
+        help="tmux capture width for live status capture.",
+    )
+    use_parser.add_argument(
+        "--tmux-rows",
+        type=int,
+        default=40,
+        help="tmux capture height for live status capture.",
+    )
+    use_parser.add_argument(
+        "--startup-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the Codex prompt.",
+    )
+    use_parser.add_argument(
+        "--status-timeout-seconds",
+        type=float,
+        default=20.0,
+        help="Seconds to wait for the status panel.",
+    )
+    use_parser.add_argument(
+        "--without-status-check",
+        action="store_true",
+        help="Skip current account status capture before switching.",
     )
     use_parser.add_argument(
         "--clean",

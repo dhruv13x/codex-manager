@@ -38,7 +38,10 @@ def test_evaluate_record_cooldown() -> None:
     assert status.remaining_seconds == 7200
 
 
-def test_evaluate_records_sorts_ready_first() -> None:
+from unittest.mock import patch
+
+@patch("codex_manager.registry.load_registry", return_value={})
+def test_evaluate_records_sorts_ready_first(mock_reg) -> None:
     ready = make_entry("2026-04-20T15:55:00+00:00", email="ready@example.com")
     locked = make_entry("2026-04-22T15:55:00+00:00", email="locked@example.com")
     statuses = evaluate_records(
@@ -49,7 +52,8 @@ def test_evaluate_records_sorts_ready_first() -> None:
     assert statuses[1].email == "locked@example.com"
 
 
-def test_evaluate_records_merges_live_status() -> None:
+@patch("codex_manager.registry.load_registry", return_value={})
+def test_evaluate_records_merges_live_status(mock_reg) -> None:
     now = datetime(2026, 4, 18, 12, 0, 0, tzinfo=timezone.utc)
     entry1 = BackupEntry(
         archive_path=Path("/tmp/a@example.com.tar.gz"),

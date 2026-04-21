@@ -18,33 +18,68 @@ class BackupEntry:
     created_at: str
     quota_percent_left: int | None
     quota_text: str
+    source: str = "local"
+    is_expired: bool = False
 
 
 def iter_backup_archives(backup_dir: Path) -> list[Path]:
     if not backup_dir.exists():
         raise FileNotFoundError(f"Backup directory does not exist: {backup_dir}")
-    return sorted(
-        [
-            path
-            for path in backup_dir.glob("*-codex.tar.gz")
-            if "-latest-codex.tar.gz" not in path.name
-        ],
-        key=lambda path: path.name,
-        reverse=True,
-    )
+    
+    # Get all archives and all metadata files
+    # We want to ensure we don't miss standalone metadata files (cooldown-only)
+    base_names = set()
+    for pattern in ["*-codex.tar.gz", "*-codex.metadata.json"]:
+        for path in backup_dir.glob(pattern):
+            if "-latest-codex.tar.gz" in path.name:
+                continue
+            
+            # Manually strip extensions to avoid pathlib.with_suffix issues with emails (.com)
+            if path.name.endswith(".tar.gz"):
+                base = path.name[:-7] # len(".tar.gz") == 7
+            else:
+                base = path.name[:-14] # len(".metadata.json") == 14
+            base_names.add(base)
+    
+    # Convert back to actual paths, prioritizing archives
+    result = []
+    for base in base_names:
+        archive = backup_dir / (base + ".tar.gz")
+        if archive.exists():
+            result.append(archive)
+        else:
+            # Standalone metadata
+            result.append(backup_dir / (base + ".metadata.json"))
+
+    return sorted(result, key=lambda path: path.name, reverse=True)
 
 
-def build_backup_entry(archive_path: Path) -> BackupEntry:
-    metadata = load_metadata_for_archive(archive_path)
-    return BackupEntry(
-        archive_path=archive_path,
-        email=metadata.get("email", "unknown"),
-        session_start_at=metadata.get("session_start_at", "unknown"),
-        reset_at=metadata.get("reset_at", "unknown"),
-        created_at=metadata.get("created_at", "unknown"),
-        quota_percent_left=metadata.get("quota_percent_left"),
-        quota_text=metadata.get("quota_text", "unknown"),
-    )
+def build_backup_entry(archive_path: Path) -> BackupEntry | None:
+    try:
+        # load_metadata_for_archive handles both archive-relative and standalone metadata
+        metadata = load_metadata_for_archive(archive_path)
+        
+        # If we were given a metadata file, try to find the archive buddy for the archive_path field
+        display_path = archive_path
+        if archive_path.name.endswith(".metadata.json"):
+            archive_buddy = archive_path.parent / (archive_path.name[:-14] + ".tar.gz")
+            if archive_buddy.exists():
+                display_path = archive_buddy
+
+        return BackupEntry(
+            archive_path=display_path,
+            email=metadata.get("email", "unknown"),
+            session_start_at=metadata.get("session_start_at", "unknown"),
+            reset_at=metadata.get("reset_at", "unknown"),
+            created_at=metadata.get("created_at", "unknown"),
+            quota_percent_left=metadata.get("quota_percent_left"),
+            quota_text=metadata.get("quota_text", "unknown"),
+            is_expired=metadata.get("is_expired", False),
+        )
+    except Exception as exc:
+        from .ui import console
+        console.print(f"[yellow]Warning:[/] Skipping corrupted record [dim]{archive_path.name}[/]: {exc}")
+        return None
 
 def list_cloud_backups(
     cloud: B2Provider,
@@ -73,6 +108,8 @@ def list_cloud_backups(
                     created_at=metadata.get("created_at", "unknown"),
                     quota_percent_left=metadata.get("quota_percent_left"),
                     quota_text=metadata.get("quota_text", "unknown"),
+                    source="cloud",
+                    is_expired=metadata.get("is_expired", False),
                 ))
             except Exception:
                 continue
@@ -120,7 +157,8 @@ def list_backups(
     ready: bool = False,
     sort_by: str = "created_at",
 ) -> list[BackupEntry]:
-    entries = [build_backup_entry(path) for path in iter_backup_archives(backup_dir)]
+    raw_entries = [build_backup_entry(path) for path in iter_backup_archives(backup_dir)]
+    entries = [e for e in raw_entries if e is not None]
     if email is not None:
         entries = [entry for entry in entries if entry.email == email]
 

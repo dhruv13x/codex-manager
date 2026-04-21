@@ -34,13 +34,15 @@ def test_resolve_reset_at_time_only():
 
 def test_resolve_reset_at_fail():
     now = datetime(2026, 4, 1, tzinfo=timezone.utc)
-    with pytest.raises(ValueError):
-        _resolve_reset_at("no reset", now=now, reference_year=2026)
+    # Now returns 'now' instead of raising ValueError
+    res = _resolve_reset_at("no reset", now=now, reference_year=2026)
+    assert res == now
 
 def test_live_status_to_text():
-    ls = LiveStatus("a@b.com", datetime(2026, 4, 1, tzinfo=timezone.utc), datetime(2026, 3, 25, tzinfo=timezone.utc), "foo", 50, "arc")
+    ls = LiveStatus("a@b.com", datetime(2026, 4, 1, tzinfo=timezone.utc), datetime(2026, 3, 25, tzinfo=timezone.utc), "foo", 50, "arc", is_expired=True)
     res = live_status_to_text(ls)
     assert "a@b.com" in res
+    assert "True" in res
 
 @patch("codex_manager.status.run_command")
 @patch("codex_manager.status.time.sleep")

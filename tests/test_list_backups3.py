@@ -98,7 +98,6 @@ def test_build_backup_entry(mock_load, tmp_path):
     entry = build_backup_entry(f1)
     assert entry.email == "a"
 
-    # Missing metadata
+    # Missing metadata - now returns None instead of raising
     mock_load.side_effect = FileNotFoundError
-    with pytest.raises(FileNotFoundError):
-        build_backup_entry(f1)
+    assert build_backup_entry(f1) is None

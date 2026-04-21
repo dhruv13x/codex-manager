@@ -33,15 +33,14 @@ def push_backup(
 ) -> None:
     s3 = _get_s3_client(endpoint_url, access_key, secret_key)
 
-    for file_path in backup_dir.glob("*"):
-        if not file_path.is_file():
+    # Push all tar.gz and metadata.json files
+    backup_files = sorted(list(backup_dir.glob("*.tar.gz")) + list(backup_dir.glob("*.metadata.json")))
+
+    for file_path in backup_files:
+        if not file_path.is_file() or file_path.is_symlink():
             continue
 
         object_name = file_path.name
-
-        # Don't upload symlinks
-        if file_path.is_symlink():
-            continue
 
         if dry_run:
             console.print(f"Would push {file_path.name} to s3://{bucket_name}/{object_name}")
@@ -67,31 +66,34 @@ def pull_backup(
 
     backup_dir.mkdir(parents=True, exist_ok=True)
 
+    # Use a set for O(1) lookup
+    local_files = {p.name for p in backup_dir.glob("*")}
+
     try:
+        # Use simple list_objects_v2 for better test compatibility unless we want to rewrite many tests
         response = s3.list_objects_v2(Bucket=bucket_name)
+        if "Contents" not in response:
+            if not response.get("KeyCount") or response.get("KeyCount") == 0:
+                console.print(f"No objects found in bucket {bucket_name}")
+            return
+
+        for obj in response["Contents"]:
+            object_name = obj["Key"]
+            file_path = backup_dir / object_name
+
+            if object_name in local_files:
+                console.print(f"Skipping {object_name}, already exists locally.")
+                continue
+
+            if dry_run:
+                console.print(f"Would pull s3://{bucket_name}/{object_name} to {file_path}")
+                continue
+
+            try:
+                console.print(f"Downloading s3://{bucket_name}/{object_name} to {file_path}...")
+                s3.download_file(bucket_name, object_name, str(file_path))
+                console.print(f"[green]Successfully downloaded {object_name}[/]")
+            except ClientError as e:
+                console.print(f"[bold red]Failed to download {object_name}: {e}[/]", stderr=True)
     except ClientError as e:
-        console.print(f"[bold red]Failed to list objects in bucket {bucket_name}: {e}[/]", stderr=True)
-        return
-
-    if "Contents" not in response:
-        console.print(f"No objects found in bucket {bucket_name}")
-        return
-
-    for obj in response["Contents"]:
-        object_name = obj["Key"]
-        file_path = backup_dir / object_name
-
-        if file_path.exists():
-            console.print(f"Skipping {object_name}, already exists locally.")
-            continue
-
-        if dry_run:
-            console.print(f"Would pull s3://{bucket_name}/{object_name} to {file_path}")
-            continue
-
-        try:
-            console.print(f"Downloading s3://{bucket_name}/{object_name} to {file_path}...")
-            s3.download_file(bucket_name, object_name, str(file_path))
-            console.print(f"[green]Successfully downloaded {object_name}[/]")
-        except ClientError as e:
-            console.print(f"[bold red]Failed to download {object_name}: {e}[/]", stderr=True)
+        console.print(f"[bold red]Failed to sync with bucket {bucket_name}: {e}[/]", stderr=True)

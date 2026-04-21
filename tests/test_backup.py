@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import tarfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from codex_manager.backup import perform_backup
 
@@ -26,6 +28,7 @@ def make_args(tmp_path: Path, source_dir: Path, status_file: Path, *, dry_run: b
         force=False,
         auth_only=False,
         prune_first=False,
+        without_status_check=False,
     )
 
 
@@ -131,3 +134,28 @@ def test_backup_prune_first(tmp_path: Path) -> None:
         names = tar.getnames()
     assert "auth.json" in names
     assert "models_cache.json" not in names
+
+
+def test_backup_without_status_check_uses_estimated_reset_name(tmp_path: Path) -> None:
+    source_dir = tmp_path / ".codex"
+    source_dir.mkdir()
+    (source_dir / "auth.json").write_text(
+        json.dumps({"email": "test@example.com"}),
+        encoding="utf-8",
+    )
+    status_file = tmp_path / "status.txt"
+    status_file.write_text("", encoding="utf-8")
+
+    args = make_args(tmp_path, source_dir, status_file, dry_run=True)
+    args.without_status_check = True
+
+    fixed_now = datetime(2026, 4, 21, 11, 18, 38, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+
+    with patch("codex_manager.backup.datetime") as mock_datetime:
+        mock_datetime.now.return_value.astimezone.return_value = fixed_now
+        archive_path, metadata_path, metadata = perform_backup(args)
+
+    assert archive_path.name == "2026-04-28-111838-test@example.com-codex.tar.gz"
+    assert metadata_path.name == "2026-04-28-111838-test@example.com-codex.metadata.json"
+    assert metadata["session_start_at"] == fixed_now.isoformat(timespec="seconds")
+    assert metadata["reset_at"] == (fixed_now + timedelta(days=7)).isoformat(timespec="seconds")

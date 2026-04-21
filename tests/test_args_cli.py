@@ -43,8 +43,10 @@ def test_main_list_backups(monkeypatch):
 def test_main_restore(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['codex-manager', 'restore'])
     with patch('codex_manager.cli.perform_restore') as _mock:
-        _mock.return_value = (MagicMock(), MagicMock(), {"email": "a", "session_start_at": "b", "reset_at": "c", "quota_text": "d"}, None)
-        main()
+        with patch('codex_manager.cli.sync_current_account_status') as _mock_sync:
+            _mock.return_value = (MagicMock(), MagicMock(), {"email": "a", "session_start_at": "b", "reset_at": "c", "quota_text": "d"}, None)
+            main()
+            _mock_sync.assert_called_once()
 
 def test_main_prune_backups(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['codex-manager', 'prune-backups'])
@@ -63,8 +65,10 @@ def test_main_prune(monkeypatch):
 def test_main_use(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['codex-manager', 'use'])
     with patch('codex_manager.cli.perform_use') as _mock:
-        _mock.return_value = (MagicMock(), MagicMock(), {"email": "a", "session_start_at": "b", "reset_at": "c", "quota_text": "d"}, None, False)
-        main()
+        with patch('codex_manager.cli.sync_current_account_status') as _mock_sync:
+            _mock.return_value = (MagicMock(), MagicMock(), {"email": "a", "session_start_at": "b", "reset_at": "c", "quota_text": "d"}, None, False)
+            main()
+            _mock_sync.assert_called_once()
 
 def test_main_sync(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['codex-manager', 'sync', 'push', '--bucket-name', 'a'])
@@ -86,8 +90,10 @@ def test_main_status(monkeypatch):
             mock_parse.return_value = status
             with patch('codex_manager.backup.read_status_text_from_args') as mock_read_status:
                 mock_read_status.return_value = "status"
-                with patch('sys.stdin.isatty', return_value=True):
-                    main()
+                with patch('codex_manager.cli.patch_metadata') as mock_patch:
+                    with patch('sys.stdin.isatty', return_value=True):
+                        main()
+                        mock_patch.assert_called_once()
 
 def test_main_profile(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['codex-manager', 'profile', 'export', 'foo.tar.gz'])

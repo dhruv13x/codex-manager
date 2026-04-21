@@ -16,10 +16,14 @@ class CooldownStatus:
     validation_status: str
     proposed_archive_name: str
     remaining_seconds: int
+    is_expired: bool = False
 
 
 def parse_iso_datetime(value: str) -> datetime:
-    return datetime.fromisoformat(value)
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        return dt.astimezone()
+    return dt
 
 
 def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownStatus:
@@ -30,6 +34,11 @@ def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownS
     remaining_seconds = int((next_available_at - current).total_seconds())
     status = "ready" if remaining_seconds <= 0 else "cooldown"
 
+    # metadata for entry might have is_expired
+    # we need to load it if not already there, but BackupEntry doesn't have it.
+    # However, list_backups.py build_backup_entry could be updated to include it.
+    is_expired = getattr(entry, "is_expired", False)
+
     return CooldownStatus(
         email=entry.email,
         status=status,
@@ -39,6 +48,7 @@ def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownS
         validation_status="backup",
         proposed_archive_name=entry.archive_path.name,
         remaining_seconds=max(0, remaining_seconds),
+        is_expired=is_expired,
     )
 
 
@@ -48,6 +58,58 @@ def evaluate_records(
     live_status: CooldownStatus | None = None,
 ) -> list[CooldownStatus]:
     statuses = [evaluate_entry(entry, now=now) for entry in entries]
+    
+    # Merge with registry
+    from .registry import load_registry
+    registry_data = load_registry()
+    
+    current = now.astimezone() if now is not None else datetime.now().astimezone()
+    
+    for email, reg_entry in registry_data.items():
+        if "reset_at" not in reg_entry or "updated_at" not in reg_entry:
+            continue
+            
+        reg_updated_at = parse_iso_datetime(reg_entry["updated_at"])
+        
+        # Check if we already have a status for this email from backups
+        existing_idx = next((i for i, s in enumerate(statuses) if s.email == email), None)
+        
+        if existing_idx is not None:
+            existing_status = statuses[existing_idx]
+            # If registry is newer, update the status
+            if reg_updated_at > existing_status.quota_end_detected_at:
+                next_available_at = parse_iso_datetime(reg_entry["reset_at"])
+                session_start_at = parse_iso_datetime(reg_entry.get("session_start_at", reg_entry["reset_at"]))
+                remaining_seconds = int((next_available_at - current).total_seconds())
+                statuses[existing_idx] = CooldownStatus(
+                    email=email,
+                    status="ready" if remaining_seconds <= 0 else "cooldown",
+                    session_start_at=session_start_at,
+                    next_available_at=next_available_at,
+                    quota_end_detected_at=reg_updated_at,
+                    validation_status="registry",
+                    proposed_archive_name=existing_status.proposed_archive_name,
+                    remaining_seconds=max(0, remaining_seconds),
+                    is_expired=reg_entry.get("is_expired", False)
+                )
+        else:
+            # Create a new status from registry
+            next_available_at = parse_iso_datetime(reg_entry["reset_at"])
+            session_start_at = parse_iso_datetime(reg_entry.get("session_start_at", reg_entry["reset_at"]))
+            remaining_seconds = int((next_available_at - current).total_seconds())
+            statuses.append(
+                CooldownStatus(
+                    email=email,
+                    status="ready" if remaining_seconds <= 0 else "cooldown",
+                    session_start_at=session_start_at,
+                    next_available_at=next_available_at,
+                    quota_end_detected_at=reg_updated_at,
+                    validation_status="registry",
+                    proposed_archive_name="none",
+                    remaining_seconds=max(0, remaining_seconds),
+                    is_expired=reg_entry.get("is_expired", False)
+                )
+            )
 
     if live_status is not None:
         # replace any historical status for the live account
@@ -82,7 +144,7 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
 
     table = Table(show_header=True, header_style="bold bright_magenta")
     table.add_column("Account", style="bright_cyan")
-    table.add_column("Status", justify="center")
+    table.add_column("Status", justify="center", no_wrap=True)
     table.add_column("Available", justify="right", style="bright_yellow")
     table.add_column("Session Start", justify="right", style="dim")
     table.add_column("Reset At", justify="right", style="dim")
@@ -90,14 +152,21 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
 
     for status in statuses:
         account_display = f"[bold]*{status.email}[/]" if status.email == live_email else status.email
-        status_display = f"[bold bright_green]{status.status.upper()}[/]" if status.status == "ready" else f"[bold bright_yellow]{status.status.upper()}[/]"
+        
+        if status.is_expired:
+            if status.status == "ready":
+                status_display = "[bold red]RE-LOGIN[/]"
+            else:
+                status_display = f"[bold red]RE-LOGIN[/]/[dim]({status.status.upper()})[/]"
+        else:
+            status_display = f"[bold bright_green]{status.status.upper()}[/]" if status.status == "ready" else f"[bold bright_yellow]{status.status.upper()}[/]"
 
         table.add_row(
             account_display,
             status_display,
             format_remaining(status.remaining_seconds),
             status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
-            status.quota_end_detected_at.strftime("%Y-%m-%d %H:%M:%S"),
+            status.next_available_at.strftime("%Y-%m-%d %H:%M:%S"),
             status.validation_status,
         )
 
@@ -105,9 +174,6 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
 
 
 def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> str:
-    # For backward compatibility, generate table and render to string.
-    # However since Table class doesn't necessarily have a render() returning string when rich is used,
-    # we can recreate the raw string generator for tests, but actually, tests can be updated or we can just keep the raw generation here.
     headers = [
         "Account",
         "Status",
@@ -119,13 +185,21 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
     rows = []
     for status in statuses:
         account_display = f"*{status.email}" if status.email == live_email else status.email
+        
+        status_text = status.status.upper()
+        if status.is_expired:
+            if status.status == "ready":
+                status_text = "RE-LOGIN"
+            else:
+                status_text = f"RE-LOGIN/({status_text})"
+
         rows.append(
             [
                 account_display,
-                status.status.upper(),
+                status_text,
                 format_remaining(status.remaining_seconds),
                 status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
-                status.quota_end_detected_at.strftime("%Y-%m-%d %H:%M:%S"),
+                status.next_available_at.strftime("%Y-%m-%d %H:%M:%S"),
                 status.validation_status,
             ]
         )

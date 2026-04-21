@@ -13,7 +13,14 @@ else:
     CODEX_MANAGER_HOME = Path(os.path.expanduser("~/.codex-manager"))
 
 DEFAULT_BACKUP_DIR = CODEX_MANAGER_HOME / "backups"
-DEFAULT_CODEX_HOME = Path(os.path.expanduser("~/.codex"))
+COOLDOWN_REGISTRY_PATH = CODEX_MANAGER_HOME / "cooldown.json"
+
+_env_codex_home = os.environ.get("CODEX_HOME")
+if _env_codex_home:
+    DEFAULT_CODEX_HOME = Path(os.path.expanduser(_env_codex_home))
+else:
+    DEFAULT_CODEX_HOME = Path(os.path.expanduser("~/.codex"))
+
 DEFAULT_COOLDOWN_DISPLAY_LIMIT = 200
 
 def load_config() -> dict[str, str | int | float | bool]:
