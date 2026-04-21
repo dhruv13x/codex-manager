@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from .ui import console
-from rich.table import Table
-from rich.panel import Panel
+from .ui import console, Table, Panel
 
 from .config import (
     DEFAULT_BACKUP_DIR,
@@ -38,7 +36,6 @@ class RichHelpParser(argparse.ArgumentParser):
         ]
         
         if subparsers_actions:
-            console.print("\n[bold magenta]Available Commands:[/ ]")
             table = Table(show_header=False, box=None, padding=(0, 2))
             for action in subparsers_actions:
                 # _SubParsersAction stores choices in a dict where values are the parsers
@@ -51,8 +48,9 @@ class RichHelpParser(argparse.ArgumentParser):
                             if sp_action.dest == choice:
                                 help_text = sp_action.help
                                 break
-                    table.add_row(f"[bold green]{choice}[/]", f"[dim]{help_text}[/]")
-            console.print(table)
+                    table.add_row(f"[bold spring_green2]{choice}[/]", f"[grey74]{help_text}[/]")
+            console.print()
+            console.print(Panel(table, title="[bold plum4]Available Commands[/]", title_align="left", border_style="plum4"))
         
         # Regular arguments
         action_groups = [
@@ -68,7 +66,6 @@ class RichHelpParser(argparse.ArgumentParser):
             if group.title == "options" and len(group._group_actions) <= 1: # just help
                 continue
 
-            console.print(f"\n[bold yellow]{group.title.capitalize()}:[/ ]")
             table = Table(show_header=False, box=None, padding=(0, 2))
             for action in group._group_actions:
                 opts = ", ".join(action.option_strings) if action.option_strings else action.dest
@@ -79,8 +76,9 @@ class RichHelpParser(argparse.ArgumentParser):
                     if isinstance(action.default, (str, int, float, bool)):
                          help_text += f" [dim](default: {action.default})[/]"
 
-                table.add_row(f"[bold cyan]{opts}[/]", f"[white]{help_text}[/]")
-            console.print(table)
+                table.add_row(f"[bold light_sky_blue1]{opts}[/]", f"[grey74]{help_text}[/]")
+            console.print()
+            console.print(Panel(table, title=f"[bold dark_sea_green4]{group.title.capitalize()}[/]", title_align="left", border_style="dark_sea_green4"))
 
         console.print("\n[dim]Run 'cm <command> --help' for more information on a specific command.[/]")
 
