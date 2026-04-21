@@ -6,6 +6,7 @@ import tarfile
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from .prune import perform_prune
 from .status import LiveStatus, capture_tmux_status_text, parse_live_status_text
@@ -149,14 +150,16 @@ def perform_backup(args) -> tuple[Path, Path, dict]:
     if metadata_path.exists():
         metadata_path.unlink()
 
-    create_backup_archive(
-        source_dir,
-        archive_path,
-        metadata_path,
-        metadata,
-        include_tmp=args.include_tmp,
-        auth_only=getattr(args, "auth_only", False),
-    )
+    from .rich_utils import console
+    with console.status(f"Creating backup: {archive_path.name} ..."):
+        create_backup_archive(
+            source_dir,
+            archive_path,
+            metadata_path,
+            metadata,
+            include_tmp=args.include_tmp,
+            auth_only=getattr(args, "auth_only", False),
+        )
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
     latest_path = backup_dir / f"{live_status.email}-latest-codex.tar.gz"
@@ -167,14 +170,18 @@ def perform_backup(args) -> tuple[Path, Path, dict]:
     return archive_path, metadata_path, metadata
 
 
-def backup_result_to_text(archive_path: Path, metadata_path: Path, metadata: dict, *, dry_run: bool) -> str:
-    lines = [
-        f"mode: {'dry-run' if dry_run else 'created'}",
-        f"archive: {archive_path}",
-        f"metadata: {metadata_path}",
-        f"email: {metadata['email']}",
-        f"session_start_at: {metadata['session_start_at']}",
-        f"reset_at: {metadata['reset_at']}",
-        f"quota_text: {metadata['quota_text']}",
+def backup_result_to_text(archive_path: Path, metadata_path: Path, metadata: dict, *, dry_run: bool) -> Any:
+    from .rich_utils import create_table
+
+    headers = ["Field", "Value"]
+    rows = [
+        ["Mode", f"[bold yellow]{'dry-run'}[/]" if dry_run else "[bold green]created[/]"],
+        ["Archive", str(archive_path)],
+        ["Metadata", str(metadata_path)],
+        ["Email", metadata["email"]],
+        ["Session Start", metadata["session_start_at"]],
+        ["Reset At", metadata["reset_at"]],
+        ["Quota", metadata["quota_text"]],
     ]
-    return "\n".join(lines)
+
+    return create_table(title="Backup Result", headers=headers, rows=rows)

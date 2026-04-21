@@ -70,4 +70,8 @@ def test_perform_backup_force(tmp_path):
 
 def test_backup_result_to_text():
     res = backup_result_to_text(Path("archive"), Path("meta"), {"email": "a", "session_start_at": "b", "reset_at": "c", "quota_text": "d"}, dry_run=True)
-    assert "dry-run" in res
+    from codex_manager.rich_utils import RICH_AVAILABLE
+    if RICH_AVAILABLE:
+        assert hasattr(res, "columns")
+    else:
+        assert "dry-run" in res

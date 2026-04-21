@@ -28,6 +28,11 @@ build/
 # Logs
 *.log
 
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
 # Optional: ignore spec if you don't want it in repo
 # CODEX_MANAGER_SPEC.md
 

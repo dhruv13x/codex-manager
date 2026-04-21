@@ -7,6 +7,7 @@ from typing import Any
 
 from .args import get_parser
 from .backup import backup_result_to_text, perform_backup
+from .rich_utils import console, error_console
 from .cloud import get_cloud_provider
 from .cooldown import CooldownStatus, evaluate_records, statuses_to_table
 from .doctor import run_doctor
@@ -25,7 +26,7 @@ def list_entries_from_args(args) -> list[BackupEntry]:
     if getattr(args, "cloud", False):
         cp = get_cloud_provider(args)
         if not cp:
-            print("Error: Could not resolve Cloud (B2) credentials.", file=sys.stderr)
+            error_console.print("[danger]Error: Could not resolve Cloud (B2) credentials.[/]")
             sys.exit(1)
         return list_cloud_backups(
             cp,
@@ -50,7 +51,7 @@ def _ensure_cloud_archive(args: Any) -> None:
 
     cp = get_cloud_provider(args)
     if not cp:
-        print("Error: Could not resolve Cloud (B2) credentials.", file=sys.stderr)
+        error_console.print("[danger]Error: Could not resolve Cloud (B2) credentials.[/]")
         sys.exit(1)
     
     # Resolve email - if not provided, we might need to recommend first
@@ -59,20 +60,21 @@ def _ensure_cloud_archive(args: Any) -> None:
         # For 'use', we can recommend here
         entries = list_cloud_backups(cp, latest_per_email=True)
         if not entries:
-            print("Error: No backups found in Cloud.", file=sys.stderr)
+            error_console.print("[danger]Error: No backups found in Cloud.[/]")
             sys.exit(1)
         rec = choose_best_account(evaluate_records(entries))
-        print(f"Automatically recommended from Cloud: {rec.selected.email}")
+        from .rich_utils import console
+        console.print(f"Automatically recommended from Cloud: {rec.selected.email}")
         email = rec.selected.email
         args.email = email
     
     if not email:
-        print("Error: --email or --from-archive is required for cloud restore/use.", file=sys.stderr)
+        error_console.print("[danger]Error: --email or --from-archive is required for cloud restore/use.[/]")
         sys.exit(1)
 
     entries = list_cloud_backups(cp, email=email, latest_per_email=True)
     if not entries:
-        print(f"Error: No backups found in Cloud for {email}.", file=sys.stderr)
+        error_console.print(f"[danger]Error: No backups found in Cloud for {email}.[/]")
         sys.exit(1)
     
     selected = entries[0]
@@ -83,9 +85,10 @@ def _ensure_cloud_archive(args: Any) -> None:
     archive_path = temp_dir / archive_name
     metadata_path = temp_dir / metadata_name
     
-    print(f"Downloading from Cloud: {archive_name} ...")
-    cp.download_file(archive_name, archive_path)
-    cp.download_file(metadata_name, metadata_path)
+    from .rich_utils import console
+    with console.status(f"Downloading from Cloud: {archive_name} ..."):
+        cp.download_file(archive_name, archive_path)
+        cp.download_file(metadata_name, metadata_path)
     
     args.from_archive = str(archive_path)
     # Clear email to prevent restore from trying to find local latest symlink
@@ -128,13 +131,13 @@ def main() -> None:
         entries = list_entries_from_args(args)
         live_status = build_live_status(args)
         statuses = evaluate_records(entries, live_status=live_status)[: args.limit]
-        print(statuses_to_table(statuses, live_email=live_status.email if live_status else None))
+        console.print(statuses_to_table(statuses, live_email=live_status.email if live_status else None))
         return
 
     if args.command == "recommend":
         entries = list_entries_from_args(args)
         recommendation = choose_best_account(evaluate_records(entries, live_status=build_live_status(args)))
-        print(recommendation_to_text(recommendation))
+        console.print(recommendation_to_text(recommendation))
         return
 
     if args.command == "status":
@@ -167,7 +170,7 @@ def main() -> None:
                 status_timeout_seconds=args.status_timeout_seconds,
             )
         status = parse_live_status_text(text, reference_year=args.reference_year)
-        print(live_status_to_text(status))
+        console.print(live_status_to_text(status))
         return
 
     if args.command == "backup":
@@ -176,14 +179,14 @@ def main() -> None:
         if getattr(args, "cloud", False) and not args.dry_run:
             cp = get_cloud_provider(args)
             if cp:
-                print(f"Uploading to Cloud: {archive_path.name} ...")
-                cp.upload_file(archive_path, archive_path.name)
-                cp.upload_file(metadata_path, metadata_path.name)
-                print("Cloud upload complete.")
+                with console.status(f"Uploading to Cloud: {archive_path.name} ..."):
+                    cp.upload_file(archive_path, archive_path.name)
+                    cp.upload_file(metadata_path, metadata_path.name)
+                console.print("[success]Cloud upload complete.[/]")
             else:
-                print("Error: Could not resolve Cloud (B2) credentials for upload.", file=sys.stderr)
+                error_console.print("[danger]Error: Could not resolve Cloud (B2) credentials for upload.[/]")
 
-        print(
+        console.print(
             backup_result_to_text(
                 archive_path,
                 metadata_path,
@@ -196,7 +199,7 @@ def main() -> None:
     if args.command == "restore":
         _ensure_cloud_archive(args)
         archive_path, dest_dir, metadata, existing_backup_path = perform_restore(args)
-        print(
+        console.print(
             restore_result_to_text(
                 archive_path,
                 dest_dir,
@@ -214,7 +217,7 @@ def main() -> None:
             from dataclasses import asdict
             print(json.dumps([asdict(e) for e in entries], indent=2, default=str))
         else:
-            print(entries_to_table(entries))
+            console.print(entries_to_table(entries))
         return
 
     if args.command == "prune-backups":
@@ -239,22 +242,22 @@ def main() -> None:
     if args.command == "profile":
         if args.action == "export":
             export_profile(Path(args.file).expanduser())
-            print(f"Profile exported to {args.file}")
+            console.print(f"[success]Profile exported to {args.file}[/]")
         elif args.action == "import":
             import_profile(Path(args.file).expanduser())
-            print(f"Profile imported from {args.file}")
+            console.print(f"[success]Profile imported from {args.file}[/]")
         return
 
     if args.command == "prune":
         source_dir = Path(args.source_dir).expanduser()
         plan = perform_prune(args)
-        print(prune_result_to_text(plan, dry_run=args.dry_run, source_dir=source_dir))
+        console.print(prune_result_to_text(plan, dry_run=args.dry_run, source_dir=source_dir))
         return
 
     if args.command == "use":
         _ensure_cloud_archive(args)
         archive_path, dest_dir, metadata, existing_backup_path, pruned = perform_use(args)
-        print(
+        console.print(
             use_result_to_text(
                 archive_path,
                 dest_dir,

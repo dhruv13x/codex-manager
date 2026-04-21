@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from .cooldown import CooldownStatus, format_remaining
 
@@ -39,16 +40,29 @@ def choose_best_account(statuses: list[CooldownStatus]) -> Recommendation:
     return Recommendation(selected=selected, reason=reason)
 
 
-def recommendation_to_text(recommendation: Recommendation) -> str:
+def recommendation_to_text(recommendation: Recommendation) -> Any:
+    from .rich_utils import create_table, get_status_style
+
     selected = recommendation.selected
-    lines = [
-        f"account: {selected.email}",
-        f"status: {selected.status}",
-        f"available_in: {format_remaining(selected.remaining_seconds)}",
-        f"next_available_at: {selected.next_available_at.strftime('%Y-%m-%d %H:%M:%S %z')}",
-        f"session_start_at: {selected.session_start_at.strftime('%Y-%m-%d %H:%M:%S %z')}",
-        f"validation_status: {selected.validation_status}",
-        f"archive_name: {selected.proposed_archive_name}",
-        f"reason: {recommendation.reason}",
+
+    status_text = selected.status.upper()
+    email_display = selected.email
+
+    style = get_status_style(selected.status)
+    if style:
+        status_text = f"[{style}]{status_text}[/]"
+    email_display = f"[bold green]{selected.email}[/]"
+
+    headers = ["Field", "Value"]
+    rows = [
+        ["Account", email_display],
+        ["Status", status_text],
+        ["Available In", format_remaining(selected.remaining_seconds)],
+        ["Next Available At", selected.next_available_at.strftime("%Y-%m-%d %H:%M:%S %z")],
+        ["Session Start At", selected.session_start_at.strftime("%Y-%m-%d %H:%M:%S %z")],
+        ["Validation Status", selected.validation_status],
+        ["Archive Name", selected.proposed_archive_name],
+        ["Reason", recommendation.reason],
     ]
-    return "\n".join(lines)
+
+    return create_table(title="Recommendation", headers=headers, rows=rows)

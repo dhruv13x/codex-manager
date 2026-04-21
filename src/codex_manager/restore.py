@@ -125,21 +125,23 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
                     tar.extract(member, path=dest_dir, filter="data")
         return archive_path, dest_dir, metadata, existing_backup_path
 
-    extracted_dir = extract_archive_to_temp(archive_path)
-    prune_metadata_file(extracted_dir)
+    from .rich_utils import console
+    with console.status(f"Restoring from: {archive_path.name} ..."):
+        extracted_dir = extract_archive_to_temp(archive_path)
+        prune_metadata_file(extracted_dir)
 
-    existing_backup_path: Path | None = None
-    if args.dry_run:
-        shutil.rmtree(extracted_dir)
-        return archive_path, dest_dir, metadata, existing_backup_path
+        existing_backup_path: Path | None = None
+        if args.dry_run:
+            shutil.rmtree(extracted_dir)
+            return archive_path, dest_dir, metadata, existing_backup_path
 
-    if dest_dir.exists() and not args.force:
-        existing_backup_path = move_existing_target(dest_dir)
-    elif dest_dir.exists() and args.force:
-        shutil.rmtree(dest_dir)
+        if dest_dir.exists() and not args.force:
+            existing_backup_path = move_existing_target(dest_dir)
+        elif dest_dir.exists() and args.force:
+            shutil.rmtree(dest_dir)
 
-    dest_dir.parent.mkdir(parents=True, exist_ok=True)
-    install_restored_tree(extracted_dir, dest_dir)
+        dest_dir.parent.mkdir(parents=True, exist_ok=True)
+        install_restored_tree(extracted_dir, dest_dir)
     return archive_path, dest_dir, metadata, existing_backup_path
 
 
@@ -150,16 +152,20 @@ def restore_result_to_text(
     existing_backup_path: Path | None,
     *,
     dry_run: bool,
-) -> str:
-    lines = [
-        f"mode: {'dry-run' if dry_run else 'restored'}",
-        f"archive: {archive_path}",
-        f"destination: {dest_dir}",
-        f"email: {metadata.get('email', 'unknown')}",
-        f"session_start_at: {metadata.get('session_start_at', 'unknown')}",
-        f"reset_at: {metadata.get('reset_at', 'unknown')}",
-        f"quota_text: {metadata.get('quota_text', 'unknown')}",
+) -> Any:
+    from .rich_utils import create_table
+
+    headers = ["Field", "Value"]
+    rows = [
+        ["Mode", f"[bold yellow]{'dry-run'}[/]" if dry_run else "[bold green]restored[/]"],
+        ["Archive", str(archive_path)],
+        ["Destination", str(dest_dir)],
+        ["Email", metadata.get("email", "unknown")],
+        ["Session Start", metadata.get("session_start_at", "unknown")],
+        ["Reset At", metadata.get("reset_at", "unknown")],
+        ["Quota", metadata.get("quota_text", "unknown")],
     ]
-    if existing_backup_path is not None:
-        lines.append(f"safety_backup: {existing_backup_path}")
-    return "\n".join(lines)
+    if existing_backup_path:
+        rows.append(["Safety Backup", str(existing_backup_path)])
+
+    return create_table(title="Restore Result", headers=headers, rows=rows)
