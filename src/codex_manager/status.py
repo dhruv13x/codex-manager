@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from .ui import console
 from .utils import build_archive_name, isoformat_local
 
 STATUS_PANEL_ACCOUNT_RE = re.compile(r"Account:\s+(\S+@\S+)")
@@ -85,30 +86,32 @@ def capture_tmux_status_text(
 
     try:
         start = time.time()
-        while True:
-            output = run_command(["tmux", "capture-pane", "-t", session_name, "-p"]).stdout
-            if "›" in output:
-                break
-            if time.time() - start > startup_timeout_seconds:
-                raise RuntimeError("Timed out waiting for Codex prompt.")
-            time.sleep(0.5)
+        with console.status("[cyan]Waiting for Codex prompt...[/cyan]", spinner="dots"):
+            while True:
+                output = run_command(["tmux", "capture-pane", "-t", session_name, "-p"]).stdout
+                if "›" in output:
+                    break
+                if time.time() - start > startup_timeout_seconds:
+                    raise RuntimeError("Timed out waiting for Codex prompt.")
+                time.sleep(0.5)
 
         run_command(["tmux", "send-keys", "-t", session_name, "/status", "Enter"])
 
         start = time.time()
         retry_sent = False
-        while True:
-            output = run_command(["tmux", "capture-pane", "-t", session_name, "-p"]).stdout
-            if "Account:" in output and "Weekly limit:" in output:
-                return output
+        with console.status("[cyan]Checking Codex status...[/cyan]", spinner="dots"):
+            while True:
+                output = run_command(["tmux", "capture-pane", "-t", session_name, "-p"]).stdout
+                if "Account:" in output and "Weekly limit:" in output:
+                    return output
 
-            elapsed = time.time() - start
-            if elapsed > 5 and not retry_sent:
-                run_command(["tmux", "send-keys", "-t", session_name, "/status", "Enter"])
-                retry_sent = True
-            if elapsed > status_timeout_seconds:
-                raise RuntimeError("Timed out waiting for Codex status panel.")
-            time.sleep(0.5)
+                elapsed = time.time() - start
+                if elapsed > 5 and not retry_sent:
+                    run_command(["tmux", "send-keys", "-t", session_name, "/status", "Enter"])
+                    retry_sent = True
+                if elapsed > status_timeout_seconds:
+                    raise RuntimeError("Timed out waiting for Codex status panel.")
+                time.sleep(0.5)
     finally:
         run_command(["tmux", "kill-session", "-t", session_name], check=False)
 

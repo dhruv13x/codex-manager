@@ -78,19 +78,19 @@ def format_remaining(seconds: int) -> str:
 
 
 def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None = None) -> None:
-    from .ui import Table, console
+    from .ui import Panel, Table, console
 
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("Account", style="cyan")
+    table = Table(show_header=True, header_style="bold bright_magenta")
+    table.add_column("Account", style="bright_cyan")
     table.add_column("Status", justify="center")
-    table.add_column("Available", justify="right")
-    table.add_column("Session Start", justify="right")
-    table.add_column("Reset At", justify="right")
-    table.add_column("Source", style="dim")
+    table.add_column("Available", justify="right", style="bright_yellow")
+    table.add_column("Session Start", justify="right", style="dim")
+    table.add_column("Reset At", justify="right", style="dim")
+    table.add_column("Source", style="dim italic")
 
     for status in statuses:
         account_display = f"[bold]*{status.email}[/]" if status.email == live_email else status.email
-        status_display = f"[green]{status.status.upper()}[/]" if status.status == "ready" else f"[yellow]{status.status.upper()}[/]"
+        status_display = f"[bold bright_green]{status.status.upper()}[/]" if status.status == "ready" else f"[bold bright_yellow]{status.status.upper()}[/]"
 
         table.add_row(
             account_display,
@@ -101,7 +101,7 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
             status.validation_status,
         )
 
-    console.print(table)
+    console.print(Panel(table, title="[bold bright_cyan]Account Cooldown Status[/]", border_style="bright_cyan", expand=False))
 
 
 def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> str:

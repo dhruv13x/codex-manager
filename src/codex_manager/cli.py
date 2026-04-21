@@ -14,7 +14,7 @@ from .list_backups import BackupEntry, list_backups, list_cloud_backups, print_e
 from .profile import export_profile, import_profile
 from .prune import perform_prune, prune_result_to_text
 from .prune_backups import perform_prune_backups
-from .recommend import choose_best_account, recommendation_to_text
+from .recommend import choose_best_account
 from .restore import perform_restore, restore_result_to_text
 from .status import capture_tmux_status_text, live_status_to_text, parse_live_status_text
 from .sync import pull_backup, push_backup
@@ -135,7 +135,21 @@ def main() -> None:
     if args.command == "recommend":
         entries = list_entries_from_args(args)
         recommendation = choose_best_account(evaluate_records(entries, live_status=build_live_status(args)))
-        console.print(recommendation_to_text(recommendation))
+
+        from .recommend import format_remaining
+        from .ui import Panel
+
+        selected = recommendation.selected
+        content = (
+            f"[bold cyan]Account:[/] {selected.email}\n"
+            f"[bold cyan]Status:[/] {'[bold green]' if selected.status == 'ready' else '[bold yellow]'}{selected.status.upper()}[/]\n"
+            f"[bold cyan]Available In:[/] {format_remaining(selected.remaining_seconds)}\n"
+            f"[bold cyan]Next Available:[/] {selected.next_available_at.strftime('%Y-%m-%d %H:%M:%S %z')}\n"
+            f"[bold cyan]Validation:[/] {selected.validation_status}\n\n"
+            f"[italic bright_white]{recommendation.reason}[/]"
+        )
+
+        console.print(Panel(content, title="[bold bright_magenta]Recommendation[/]", border_style="bright_magenta", expand=False))
         return
 
     if args.command == "status":
