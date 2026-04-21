@@ -159,7 +159,35 @@ def list_backups(
     return entries
 
 
-def entries_to_table(entries: list[BackupEntry]) -> str:
+def entries_to_table(entries: list[BackupEntry]) -> str | object:
+    try:
+        from rich.table import Table
+
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Archive", style="cyan")
+        table.add_column("Email", style="green")
+        table.add_column("Session Start")
+        table.add_column("Reset At")
+        table.add_column("Quota", justify="right")
+
+        for entry in entries:
+            quota = (
+                f"{entry.quota_percent_left}%"
+                if entry.quota_percent_left is not None
+                else "unknown"
+            )
+            archive_name = entry.archive_path.name if hasattr(entry, "archive_path") else getattr(entry, "proposed_archive_name", getattr(entry, "archive_name", "unknown"))
+            table.add_row(
+                str(archive_name),
+                str(entry.email),
+                str(entry.session_start_at),
+                str(entry.reset_at),
+                str(quota),
+            )
+        return table
+    except ImportError:
+        pass
+
     headers = [
         "Archive",
         "Email",

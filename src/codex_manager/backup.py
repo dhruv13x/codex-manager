@@ -167,7 +167,31 @@ def perform_backup(args) -> tuple[Path, Path, dict]:
     return archive_path, metadata_path, metadata
 
 
-def backup_result_to_text(archive_path: Path, metadata_path: Path, metadata: dict, *, dry_run: bool) -> str:
+def backup_result_to_text(archive_path: Path, metadata_path: Path, metadata: dict, *, dry_run: bool) -> str | object:
+    try:
+        from rich.panel import Panel
+        from rich.text import Text
+
+        t = Text()
+        mode_color = "yellow" if dry_run else "green"
+        t.append("mode: ", style="bold")
+        t.append(f"{'dry-run' if dry_run else 'created'}\n", style=mode_color)
+        t.append("archive: ", style="bold")
+        t.append(f"{archive_path}\n", style="cyan")
+        t.append("metadata: ", style="bold")
+        t.append(f"{metadata_path}\n", style="cyan")
+        t.append("email: ", style="bold")
+        t.append(f"{metadata['email']}\n")
+        t.append("session_start_at: ", style="bold")
+        t.append(f"{metadata['session_start_at']}\n")
+        t.append("reset_at: ", style="bold")
+        t.append(f"{metadata['reset_at']}\n")
+        t.append("quota_text: ", style="bold")
+        t.append(f"{metadata['quota_text']}")
+        return Panel(t, title="Backup Result", border_style="blue")
+    except ImportError:
+        pass
+
     lines = [
         f"mode: {'dry-run' if dry_run else 'created'}",
         f"archive: {archive_path}",

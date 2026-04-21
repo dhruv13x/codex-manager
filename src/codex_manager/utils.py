@@ -1,6 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
+
+
+class DummyConsole:
+    def print(self, *args: Any, **kwargs: Any) -> None:
+        print(*args)
+
+
+def get_console() -> Any:
+    try:
+        from rich.console import Console
+
+        return Console()
+    except ImportError:
+        return DummyConsole()
 
 
 def isoformat_local(dt: datetime) -> str:
