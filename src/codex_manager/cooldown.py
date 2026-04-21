@@ -77,7 +77,37 @@ def format_remaining(seconds: int) -> str:
     return f"{minutes}m"
 
 
+def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None = None) -> None:
+    from .ui import Table, console
+
+    table = Table(show_header=True, header_style="bold magenta")
+    table.add_column("Account", style="cyan")
+    table.add_column("Status", justify="center")
+    table.add_column("Available", justify="right")
+    table.add_column("Session Start", justify="right")
+    table.add_column("Reset At", justify="right")
+    table.add_column("Source", style="dim")
+
+    for status in statuses:
+        account_display = f"[bold]*{status.email}[/]" if status.email == live_email else status.email
+        status_display = f"[green]{status.status.upper()}[/]" if status.status == "ready" else f"[yellow]{status.status.upper()}[/]"
+
+        table.add_row(
+            account_display,
+            status_display,
+            format_remaining(status.remaining_seconds),
+            status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
+            status.quota_end_detected_at.strftime("%Y-%m-%d %H:%M:%S"),
+            status.validation_status,
+        )
+
+    console.print(table)
+
+
 def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = None) -> str:
+    # For backward compatibility, generate table and render to string.
+    # However since Table class doesn't necessarily have a render() returning string when rich is used,
+    # we can recreate the raw string generator for tests, but actually, tests can be updated or we can just keep the raw generation here.
     headers = [
         "Account",
         "Status",

@@ -26,7 +26,8 @@ def import_profile(import_path: Path) -> None:
         if backup_path.exists():
             shutil.rmtree(backup_path)
         shutil.move(CODEX_MANAGER_HOME, backup_path)
-        print(f"Backed up existing profile to {backup_path}")
+        from .ui import console
+        console.print(f"Backed up existing profile to {backup_path}")
 
     with tarfile.open(import_path, "r:gz") as tar:
         # Extract into parent directory since the archive contains the root folder

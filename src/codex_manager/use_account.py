@@ -31,8 +31,9 @@ def perform_use(args: Any) -> tuple[Path, Path, dict[str, Any], Path | None, boo
         
         # Build a temporary live status if needed? 
         # (Simplified: just recommend from entries)
+        from .ui import console
         recommendation = choose_best_account(evaluate_records(entries))
-        print(f"Automatically recommended: {recommendation.selected.email}")
+        console.print(f"Automatically recommended: [cyan]{recommendation.selected.email}[/]")
         args.email = recommendation.selected.email
 
     # 2. Pre-Restore: Prune if requested

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +9,7 @@ except ImportError:
     B2Api = None
 
 from .credentials import resolve_b2_credentials
+from .ui import console
 
 
 class CloudFile:
@@ -53,7 +53,7 @@ class B2Provider:
                         last_modified=file_version.upload_timestamp / 1000.0  # ms to seconds
                     ))
         except Exception as e:
-            print(f"Cloud list failed: {e}", file=sys.stderr)
+            console.print(f"[bold red]Cloud list failed: {e}[/]", style="red", stderr=True)
         return files
 
     def delete_file(self, remote_path: str) -> None:
