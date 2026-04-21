@@ -6,6 +6,8 @@ from pathlib import Path
 import boto3
 from botocore.exceptions import ClientError
 
+from .ui import console
+
 
 def _get_s3_client(endpoint_url: str | None, access_key: str | None, secret_key: str | None) -> boto3.client:
     # use env vars if not passed
@@ -42,15 +44,15 @@ def push_backup(
             continue
 
         if dry_run:
-            print(f"Would push {file_path.name} to s3://{bucket_name}/{object_name}")
+            console.print(f"Would push {file_path.name} to s3://{bucket_name}/{object_name}")
             continue
 
         try:
-            print(f"Uploading {file_path.name} to s3://{bucket_name}/{object_name}...")
+            console.print(f"Uploading {file_path.name} to s3://{bucket_name}/{object_name}...")
             s3.upload_file(str(file_path), bucket_name, object_name)
-            print(f"Successfully uploaded {file_path.name}")
+            console.print(f"[green]Successfully uploaded {file_path.name}[/]")
         except ClientError as e:
-            print(f"Failed to upload {file_path.name}: {e}")
+            console.print(f"[bold red]Failed to upload {file_path.name}: {e}[/]", stderr=True)
 
 
 def pull_backup(
@@ -68,11 +70,11 @@ def pull_backup(
     try:
         response = s3.list_objects_v2(Bucket=bucket_name)
     except ClientError as e:
-        print(f"Failed to list objects in bucket {bucket_name}: {e}")
+        console.print(f"[bold red]Failed to list objects in bucket {bucket_name}: {e}[/]", stderr=True)
         return
 
     if "Contents" not in response:
-        print(f"No objects found in bucket {bucket_name}")
+        console.print(f"No objects found in bucket {bucket_name}")
         return
 
     for obj in response["Contents"]:
@@ -80,16 +82,16 @@ def pull_backup(
         file_path = backup_dir / object_name
 
         if file_path.exists():
-            print(f"Skipping {object_name}, already exists locally.")
+            console.print(f"Skipping {object_name}, already exists locally.")
             continue
 
         if dry_run:
-            print(f"Would pull s3://{bucket_name}/{object_name} to {file_path}")
+            console.print(f"Would pull s3://{bucket_name}/{object_name} to {file_path}")
             continue
 
         try:
-            print(f"Downloading s3://{bucket_name}/{object_name} to {file_path}...")
+            console.print(f"Downloading s3://{bucket_name}/{object_name} to {file_path}...")
             s3.download_file(bucket_name, object_name, str(file_path))
-            print(f"Successfully downloaded {object_name}")
+            console.print(f"[green]Successfully downloaded {object_name}[/]")
         except ClientError as e:
-            print(f"Failed to download {object_name}: {e}")
+            console.print(f"[bold red]Failed to download {object_name}: {e}[/]", stderr=True)

@@ -6,13 +6,10 @@ import sys
 import urllib.request
 from pathlib import Path
 
-from rich.console import Console
-from rich.table import Table
-
 from .cloud import get_cloud_provider
 from .config import DEFAULT_BACKUP_DIR, DEFAULT_CODEX_HOME
+from .ui import Table, console
 
-console = Console()
 
 def _check_command(command: str) -> bool:
     try:

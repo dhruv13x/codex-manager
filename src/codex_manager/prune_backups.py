@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .list_backups import build_backup_entry, iter_backup_archives
+from .ui import console
 
 
 def perform_prune_backups(
@@ -12,7 +13,7 @@ def perform_prune_backups(
     dry_run: bool = False,
 ) -> None:
     if keep is None and not keep_latest_per_email:
-        print("Nothing to do: must specify --keep or --keep-latest-per-email")
+        console.print("Nothing to do: must specify --keep or --keep-latest-per-email")
         return
 
     entries = [build_backup_entry(path) for path in iter_backup_archives(backup_dir)]
@@ -40,22 +41,22 @@ def perform_prune_backups(
             entries = entries[:keep]
 
     if not to_delete:
-        print("No backups matched pruning criteria.")
+        console.print("No backups matched pruning criteria.")
         return
 
     for entry in to_delete:
         if dry_run:
-            print(f"Would delete {entry.archive_path.name}")
+            console.print(f"Would delete {entry.archive_path.name}")
             metadata_path = entry.archive_path.with_name(entry.archive_path.name.replace(".tar.gz", ".metadata.json"))
             if metadata_path.exists():
-                print(f"Would delete {metadata_path.name}")
+                console.print(f"Would delete {metadata_path.name}")
             continue
 
-        print(f"Deleting {entry.archive_path.name}...")
+        console.print(f"Deleting {entry.archive_path.name}...")
         try:
             entry.archive_path.unlink()
             metadata_path = entry.archive_path.with_name(entry.archive_path.name.replace(".tar.gz", ".metadata.json"))
             if metadata_path.exists():
                 metadata_path.unlink()
         except OSError as err:
-            print(f"Failed to delete {entry.archive_path.name}: {err}")
+            console.print(f"[bold red]Failed to delete {entry.archive_path.name}: {err}[/]", stderr=True)
