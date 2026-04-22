@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import MagicMock
-import pytest
 
-from codex_manager.list_backups import list_backups, list_cloud_backups, build_backup_entry
+from codex_manager.list_backups import build_backup_entry, list_backups, list_cloud_backups
+
 
 def test_list_backups_sort_session(mocker, tmp_path):
     b1 = MagicMock()

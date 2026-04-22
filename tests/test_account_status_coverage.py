@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import MagicMock
+
 import pytest
 
-from codex_manager.account_status import patch_metadata
+from codex_manager.account_status import patch_metadata, sync_current_account_status
+from codex_manager.status import TokenExpiredError
+
 
 def test_patch_metadata_local_update_fail(mocker, tmp_path, capsys) -> None:
     backup_dir = tmp_path / "backups"
@@ -53,8 +54,7 @@ def test_patch_metadata_fallback_datetime_parsing(mocker, tmp_path) -> None:
     # Make sure we didn't crash parsing invalid dates, they just fall through
     mock_update.assert_called_once()
 
-from codex_manager.account_status import sync_current_account_status
-from codex_manager.status import TokenExpiredError
+
 
 def test_sync_current_account_status_no_email(tmp_path, capsys):
     class Args:

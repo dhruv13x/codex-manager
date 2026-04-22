@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import MagicMock
-import pytest
 
 from codex_manager.account_status import patch_metadata
+
 
 def test_patch_metadata_local_create_fail(mocker, tmp_path, capsys) -> None:
     backup_dir = tmp_path / "backups"
     backup_dir.mkdir()
 
     email = "test@example.com"
-    archive_name = f"2026-04-19-100200-{email}-codex.metadata.json"
 
     # Do not create existing metadata file
     class Args:

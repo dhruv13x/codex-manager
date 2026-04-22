@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock
-from codex_manager.cli import list_entries_from_args, handle_status, handle_list_backups, handle_prune, main
-from codex_manager.list_backups import BackupEntry
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from unittest.mock import MagicMock
+
+from codex_manager.cli import (
+    handle_list_backups,
+    handle_prune,
+    list_entries_from_args,
+    main,
+)
+from codex_manager.list_backups import BackupEntry
+
 
 def test_list_entries_from_args_seen_emails(mocker, tmp_path):
     class Args:
