@@ -1,8 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from codex_manager.list_backups import (
     build_backup_entry,
     entries_to_table,

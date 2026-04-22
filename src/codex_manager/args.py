@@ -565,6 +565,11 @@ def get_parser() -> argparse.ArgumentParser:
         "file",
         help="Path to the profile archive (.tar.gz) to export to or import from.",
     )
+    profile_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would happen without modifying metadata.",
+    )
 
     doctor_parser = subparsers.add_parser(
         "doctor",
@@ -689,6 +694,11 @@ def get_parser() -> argparse.ArgumentParser:
     use_parser.add_argument("--bucket", help="B2 Bucket Name")
     use_parser.add_argument("--b2-id", help="B2 Key ID")
     use_parser.add_argument("--b2-key", help="B2 App Key")
+    status_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would happen without modifying metadata.",
+    )
 
     sync_parser = subparsers.add_parser(
         "sync",

@@ -40,6 +40,7 @@ def test_evaluate_record_cooldown() -> None:
 
 from unittest.mock import patch
 
+
 @patch("codex_manager.registry.load_registry", return_value={})
 def test_evaluate_records_sorts_ready_first(mock_reg) -> None:
     ready = make_entry("2026-04-20T15:55:00+00:00", email="ready@example.com")

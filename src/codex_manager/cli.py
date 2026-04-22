@@ -254,6 +254,7 @@ def handle_status(args: Any) -> None:
                     args=args,
                     session_start_at=None,
                     is_expired=True,
+                    dry_run=getattr(args, "dry_run", False),
                 )
             except Exception as patch_exc:
                 console.print(f"[yellow]Warning:[/] Failed to patch metadata: {patch_exc}")
@@ -272,6 +273,7 @@ def handle_status(args: Any) -> None:
             args=args,
             session_start_at=status.session_start_at,
             is_expired=status.is_expired,
+            dry_run=getattr(args, "dry_run", False),
         )
     except Exception as exc:
         console.print(f"[yellow]Warning:[/] Failed to patch metadata: {exc}")
@@ -281,14 +283,18 @@ def handle_status(args: Any) -> None:
 def handle_backup(args: Any) -> None:
     archive_path, metadata_path, metadata = perform_backup(args)
 
-    if getattr(args, "cloud", False) and not args.dry_run:
+    if getattr(args, "cloud", False):
         cp = get_cloud_provider(args)
         if cp:
-            console.print(f"Uploading to Cloud: {archive_path.name} ...")
-            cp.upload_file(archive_path, archive_path.name)
-            cp.upload_file(metadata_path, metadata_path.name)
-            sync_registry_with_cloud(cp)
-            console.print("[green]Cloud upload complete.[/]")
+            if not args.dry_run:
+                console.print(f"Uploading to Cloud: {archive_path.name} ...")
+                cp.upload_file(archive_path, archive_path.name)
+                cp.upload_file(metadata_path, metadata_path.name)
+                sync_registry_with_cloud(cp)
+                console.print("[green]Cloud upload complete.[/]")
+            else:
+                console.print(f"Would upload to Cloud: {archive_path.name} ...")
+                sync_registry_with_cloud(cp, dry_run=args.dry_run)
         else:
             console.print(
                 "[bold red]Error:[/] Could not resolve Cloud (B2) credentials for upload.",
@@ -350,11 +356,13 @@ def handle_doctor(args: Any) -> None:
 
 def handle_profile(args: Any) -> None:
     if args.action == "export":
-        export_profile(Path(args.file).expanduser())
-        console.print(f"Profile exported to {args.file}")
+        export_profile(Path(args.file).expanduser(), dry_run=getattr(args, "dry_run", False))
+        if not getattr(args, "dry_run", False):
+            console.print(f"Profile exported to {args.file}")
     elif args.action == "import":
-        import_profile(Path(args.file).expanduser())
-        console.print(f"Profile imported from {args.file}")
+        import_profile(Path(args.file).expanduser(), dry_run=getattr(args, "dry_run", False))
+        if not getattr(args, "dry_run", False):
+            console.print(f"Profile imported from {args.file}")
 
 
 def handle_prune(args: Any) -> None:
