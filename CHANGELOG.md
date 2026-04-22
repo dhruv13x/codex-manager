@@ -1,5 +1,9 @@
 # Changelog
 
+## [5.0.0] - 2026-04-22
+### Features
+- add version flag (-v, --version)
+
 ## [4.0.0] - 2026-04-22
 ### Features
 - implement purge and remove commands with associated tests
