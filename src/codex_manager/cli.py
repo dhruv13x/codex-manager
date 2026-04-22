@@ -72,7 +72,8 @@ def list_entries_from_args(args: Any) -> list[BackupEntry]:
             sys.exit(1)
 
     if latest_per_email:
-        all_entries.sort(key=lambda entry: entry.created_at, reverse=True)
+        # Sort by reset_at descending so the newest state is picked
+        all_entries.sort(key=lambda entry: entry.reset_at, reverse=True)
         seen_emails: dict[str, BackupEntry] = {}
         for entry in all_entries:
             if entry.email not in seen_emails:
@@ -166,6 +167,8 @@ def build_live_status(args: Any) -> CooldownStatus | None:
         validation_status="live",
         proposed_archive_name=live_status.proposed_archive_name,
         remaining_seconds=max(0, remaining_seconds),
+        quota_text=live_status.quota_text,
+        quota_percent_left=live_status.quota_percent_left,
         is_expired=live_status.is_expired,
     )
 

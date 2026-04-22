@@ -16,6 +16,8 @@ class CooldownStatus:
     validation_status: str
     proposed_archive_name: str
     remaining_seconds: int
+    quota_text: str | None = None
+    quota_percent_left: int | None = None
     is_expired: bool = False
 
 
@@ -34,9 +36,6 @@ def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownS
     remaining_seconds = int((next_available_at - current).total_seconds())
     status = "ready" if remaining_seconds <= 0 else "cooldown"
 
-    # metadata for entry might have is_expired
-    # we need to load it if not already there, but BackupEntry doesn't have it.
-    # However, list_backups.py build_backup_entry could be updated to include it.
     is_expired = getattr(entry, "is_expired", False)
 
     return CooldownStatus(
@@ -48,6 +47,8 @@ def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownS
         validation_status="backup",
         proposed_archive_name=entry.archive_path.name,
         remaining_seconds=max(0, remaining_seconds),
+        quota_text=getattr(entry, "quota_text", None),
+        quota_percent_left=getattr(entry, "quota_percent_left", None),
         is_expired=is_expired,
     )
 
@@ -90,6 +91,8 @@ def evaluate_records(
                     validation_status="registry",
                     proposed_archive_name=existing_status.proposed_archive_name,
                     remaining_seconds=max(0, remaining_seconds),
+                    quota_text=reg_entry.get("quota_text"),
+                    quota_percent_left=reg_entry.get("quota_percent_left"),
                     is_expired=reg_entry.get("is_expired", False)
                 )
         else:
@@ -107,6 +110,8 @@ def evaluate_records(
                     validation_status="registry",
                     proposed_archive_name="none",
                     remaining_seconds=max(0, remaining_seconds),
+                    quota_text=reg_entry.get("quota_text"),
+                    quota_percent_left=reg_entry.get("quota_percent_left"),
                     is_expired=reg_entry.get("is_expired", False)
                 )
             )
@@ -145,6 +150,7 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
     table = Table(show_header=True, header_style="bold bright_magenta")
     table.add_column("Account", style="bright_cyan")
     table.add_column("Status", justify="center", no_wrap=True)
+    table.add_column("Quota", justify="right", style="bright_yellow")
     table.add_column("Available", justify="right", style="bright_yellow")
     table.add_column("Session Start", justify="right", style="dim")
     table.add_column("Reset At", justify="right", style="dim")
@@ -161,9 +167,16 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
         else:
             status_display = f"[bold bright_green]{status.status.upper()}[/]" if status.status == "ready" else f"[bold bright_yellow]{status.status.upper()}[/]"
 
+        quota_display = (
+            f"{status.quota_percent_left}%"
+            if status.quota_percent_left is not None
+            else "unknown"
+        )
+
         table.add_row(
             account_display,
             status_display,
+            quota_display,
             format_remaining(status.remaining_seconds),
             status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
             status.next_available_at.strftime("%Y-%m-%d %H:%M:%S"),
