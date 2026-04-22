@@ -2,7 +2,7 @@
 name = "codex-manager"
 version = "3.0.0"
 description = "Codex account snapshot manager"
-readme = "CODEX_MANAGER_SPEC.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
