@@ -31,7 +31,8 @@ from .use_account import perform_use, use_result_to_text
 
 def list_entries_from_args(args: Any) -> list[BackupEntry]:
     force_latest = args.command in ["cooldown", "recommend"]
-    latest_per_email = getattr(args, "latest_per_email", False) or force_latest
+    # For list-backups, it now defaults to True in args.py, but we ensure it here
+    latest_per_email = getattr(args, "latest_per_email", True) or force_latest
     all_entries: list[BackupEntry] = []
 
     backup_dir = Path(args.backup_dir).expanduser()

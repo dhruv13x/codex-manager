@@ -507,7 +507,14 @@ def get_parser() -> argparse.ArgumentParser:
     list_backups_parser.add_argument(
         "--latest-per-email",
         action="store_true",
-        help="Only show the latest backup for each email.",
+        default=True,
+        help="Only show the latest backup for each email (Default).",
+    )
+    list_backups_parser.add_argument(
+        "--all",
+        action="store_false",
+        dest="latest_per_email",
+        help="Show all backups, including historical and duplicate entries.",
     )
     list_backups_parser.add_argument(
         "--ready",
