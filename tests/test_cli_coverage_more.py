@@ -44,6 +44,7 @@ def test_list_entries_from_args_cooldown_no_cloud(mocker, tmp_path):
         backup_dir = str(tmp_path)
         cloud = False
     args = Args()
+    mocker.patch("codex_manager.cli.get_cloud_provider", return_value=None)
     entries = list_entries_from_args(args)
     assert entries == []
 
