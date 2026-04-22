@@ -42,7 +42,7 @@ def merge_registries(
     return merged
 
 
-def sync_registry_with_cloud(cp: B2Provider) -> None:
+def sync_registry_with_cloud(cp: B2Provider, dry_run: bool = False) -> None:
     """Download remote registry, merge with local, and upload the result."""
     from .ui import console
 
@@ -62,7 +62,10 @@ def sync_registry_with_cloud(cp: B2Provider) -> None:
                 cp.download_file(remote_path, tmp_path)
                 remote_data = json.loads(tmp_path.read_text(encoding="utf-8"))
                 local_data = merge_registries(local_data, remote_data)
-                save_registry(local_data)
+                if not dry_run:
+                    save_registry(local_data)
+                else:
+                    console.print("Would merge cloud registry with local registry")
             except Exception as exc:
                 console.print(f"[yellow]Warning:[/] Failed to merge cloud registry: {exc}")
 
@@ -73,8 +76,11 @@ def sync_registry_with_cloud(cp: B2Provider) -> None:
         tmp_path = Path(tmp_dir) / "cooldown.json"
         tmp_path.write_text(json.dumps(local_data, indent=2), encoding="utf-8")
         try:
-            cp.upload_file(tmp_path, remote_path)
-            console.print("[green]Cloud registry synchronized.[/]")
+            if not dry_run:
+                cp.upload_file(tmp_path, remote_path)
+                console.print("[green]Cloud registry synchronized.[/]")
+            else:
+                console.print(f"Would upload registry to cloud: {remote_path}")
         except Exception as exc:
             console.print(f"[yellow]Warning:[/] Failed to upload registry to cloud: {exc}")
 
@@ -87,6 +93,7 @@ def update_registry_entry(
     quota_text: str | None = None,
     quota_percent_left: int | None = None,
     session_start_at: datetime | str | None = None,
+    dry_run: bool = False,
 ) -> None:
     registry = load_registry()
     entry = registry.get(email, {})
@@ -106,7 +113,11 @@ def update_registry_entry(
     
     entry["updated_at"] = datetime.now().astimezone().isoformat()
     registry[email] = entry
-    save_registry(registry)
+    if not dry_run:
+        save_registry(registry)
+    else:
+        from .ui import console
+        console.print(f"Would update registry entry for {email}")
 
 
 def get_registry_entry(email: str) -> dict[str, Any] | None:

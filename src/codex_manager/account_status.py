@@ -24,6 +24,7 @@ def patch_metadata(
     args: Any = None,
     session_start_at: Any | None = None,
     is_expired: bool = False,
+    dry_run: bool = False,
 ) -> None:
     backup_dir = Path(args.backup_dir).expanduser() if args and hasattr(args, "backup_dir") else Path("~/.codex-manager/backups").expanduser()
     
@@ -78,10 +79,13 @@ def patch_metadata(
                     data["quota_percent_left"] = quota_percent_left
                 data["is_expired"] = is_expired
                 data["updated_at"] = datetime.now().astimezone().isoformat()
-                metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-                console.print(
-                    f"Updated local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]"
-                )
+                if not dry_run:
+                    metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                    console.print(
+                        f"Updated local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]"
+                    )
+                else:
+                    console.print(f"Would update local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]")
             except Exception as exc:
                 console.print(f"[yellow]Warning:[/] Failed to patch local metadata: {exc}")
         else:
@@ -113,10 +117,13 @@ def patch_metadata(
                 "metadata_only": True,
             }
             try:
-                metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-                console.print(
-                    f"Created cooldown-only metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]"
-                )
+                if not dry_run:
+                    metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                    console.print(
+                        f"Created cooldown-only metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]"
+                    )
+                else:
+                    console.print(f"Would create cooldown-only metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]")
             except Exception as exc:
                 console.print(f"[yellow]Warning:[/] Failed to create local metadata: {exc}")
 
@@ -127,12 +134,13 @@ def patch_metadata(
         quota_text=quota_text,
         quota_percent_left=quota_percent_left,
         session_start_at=final_session_start_at,
+        dry_run=dry_run,
     )
 
     if args and getattr(args, "cloud", False):
         cp = get_cloud_provider(args)
         if cp:
-            sync_registry_with_cloud(cp)
+            sync_registry_with_cloud(cp, dry_run=dry_run)
             entries = list_cloud_backups(cp, email=email, latest_per_email=True)
             if entries:
                 selected = entries[0]
@@ -161,11 +169,14 @@ def patch_metadata(
                         data["updated_at"] = datetime.now().astimezone().isoformat()
                         local_metadata.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-                        console.print(
-                            f"Uploading updated metadata to Cloud: [dim]{metadata_name}[/] ..."
-                        )
-                        cp.upload_file(local_metadata, metadata_name)
-                        console.print("Cloud metadata update complete.")
+                        if not dry_run:
+                            console.print(
+                                f"Uploading updated metadata to Cloud: [dim]{metadata_name}[/] ..."
+                            )
+                            cp.upload_file(local_metadata, metadata_name)
+                            console.print("Cloud metadata update complete.")
+                        else:
+                            console.print(f"Would upload updated metadata to Cloud: [dim]{metadata_name}[/]")
                     except Exception as exc:
                         console.print(f"[yellow]Warning:[/] Failed to patch cloud metadata: {exc}")
         else:
@@ -215,6 +226,7 @@ def sync_current_account_status(args: Any) -> None:
             quota_percent_left=None,
             args=args,
             session_start_at=session_start_at,
+            dry_run=getattr(args, "dry_run", False),
         )
         return
 
@@ -241,6 +253,7 @@ def sync_current_account_status(args: Any) -> None:
                     args=args,
                     session_start_at=None,
                     is_expired=True,
+                    dry_run=getattr(args, "dry_run", False),
                 )
             except Exception:
                 # If we can't even get the email, we use the one from auth.json
@@ -251,6 +264,7 @@ def sync_current_account_status(args: Any) -> None:
                     quota_percent_left=None,
                     args=args,
                     is_expired=True,
+                    dry_run=getattr(args, "dry_run", False),
                 )
             sys.exit(1)
         except Exception as exc:
@@ -268,6 +282,7 @@ def sync_current_account_status(args: Any) -> None:
 
     if text:
         try:
+            from .status import parse_live_status_text
             status = parse_live_status_text(
                 text,
                 reference_year=getattr(args, "reference_year", None),
@@ -280,6 +295,7 @@ def sync_current_account_status(args: Any) -> None:
                 args=args,
                 session_start_at=status.session_start_at,
                 is_expired=status.is_expired,
+                dry_run=getattr(args, "dry_run", False),
             )
         except Exception as exc:
             console.print(
