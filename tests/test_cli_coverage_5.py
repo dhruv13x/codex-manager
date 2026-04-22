@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import MagicMock
-from codex_manager.cli import handle_doctor, handle_sync, main
+
+from codex_manager.cli import handle_doctor, handle_sync
+
 
 def test_handle_doctor_exit(mocker):
     class Args:

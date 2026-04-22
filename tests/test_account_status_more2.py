@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 from unittest.mock import MagicMock
-import pytest
 
 from codex_manager.account_status import patch_metadata
+
 
 def test_patch_metadata_local_create_fail(mocker, tmp_path, capsys) -> None:
     backup_dir = tmp_path / "backups"

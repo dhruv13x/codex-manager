@@ -7,9 +7,9 @@ from unittest.mock import MagicMock
 
 from codex_manager.account_status import patch_metadata, sync_current_account_status
 from codex_manager.cli import handle_backup, handle_profile, handle_status
-from codex_manager.registry import sync_registry_with_cloud, update_registry_entry
 from codex_manager.profile import export_profile, import_profile
-import pytest
+from codex_manager.registry import sync_registry_with_cloud, update_registry_entry
+
 
 def test_patch_metadata_dry_run(mocker, tmp_path: Path, capsys) -> None:
     backup_dir = tmp_path / "backups"

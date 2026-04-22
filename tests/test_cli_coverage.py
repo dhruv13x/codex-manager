@@ -1,8 +1,10 @@
 from __future__ import annotations
-import pytest
+
 from pathlib import Path
 from unittest.mock import MagicMock
+
 from codex_manager.cli import handle_backup, handle_profile, handle_status
+
 
 def test_handle_backup_cloud_dry_run(mocker, capsys) -> None:
     class Args:

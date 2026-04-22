@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock
-from codex_manager.registry import merge_registries, get_registry_entry
+from codex_manager.registry import get_registry_entry, merge_registries
+
 
 def test_merge_registries_both_present():
     local = {

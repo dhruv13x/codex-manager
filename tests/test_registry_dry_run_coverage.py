@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock
-import pytest
 
 from codex_manager.registry import sync_registry_with_cloud, update_registry_entry
+
 
 def test_sync_registry_with_cloud_dry_run(mocker, capsys) -> None:
     mock_cp = MagicMock()

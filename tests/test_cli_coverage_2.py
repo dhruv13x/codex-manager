@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
-from codex_manager.cli import list_entries_from_args, _read_status_command_input
-from codex_manager.status import TokenExpiredError
+
+from codex_manager.cli import _read_status_command_input, list_entries_from_args
+
 
 def test_list_entries_from_args_cloud_disabled_force_latest(mocker, tmp_path):
     class Args:

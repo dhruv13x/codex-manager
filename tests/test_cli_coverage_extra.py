@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import pytest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from codex_manager.cli import list_entries_from_args, _ensure_cloud_archive
+import pytest
+
+from codex_manager.cli import list_entries_from_args
 from codex_manager.list_backups import BackupEntry
-from datetime import datetime
+
 
 def test_list_entries_cloud_no_cp(mocker, tmp_path, capsys):
     class Args:

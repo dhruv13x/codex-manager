@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
-import pytest
-from unittest.mock import MagicMock
-from codex_manager.cli import handle_status, handle_backup
-from codex_manager.status import TokenExpiredError
 from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
+
+from codex_manager.cli import handle_backup, handle_status
+from codex_manager.status import TokenExpiredError
+
 
 def test_handle_status_token_expired_auth_json(mocker, tmp_path, capsys):
     class Args:
