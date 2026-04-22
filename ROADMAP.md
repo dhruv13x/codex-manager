@@ -2,51 +2,53 @@
 
 This is a living document that balances **Innovation**, **Stability**, and **Debt**.
 
+---
+
 ## 🏁 Phase 0: The Core (Stability & Debt)
 **Goal**: Solid foundation.
-**Risk**: Low
+**Dependencies**: None.
+*Risk*: Low.
 
-### Quality & Reliability
-- [ ] **Testing**: Ensure test coverage remains > 80%. `[Debt]` `(Size: M)`
-- [ ] **CI/CD**: Enforce strict linting and type checking (mypy) in pipelines. `[Debt]` `(Size: S)`
+### Core Reliability
+- [ ] **Testing**: Coverage > 80%. `[Debt]` `(Size: M)` `[Risk: Low]`
+- [ ] **CI/CD**: Linting, Type Checking (mypy). `[Debt]` `(Size: S)` `[Risk: Low]`
 
-### Documentation & Maintenance
-- [ ] **Documentation**: Write comprehensive README and API docs. `[Debt]` `(Size: S)`
-- [ ] **Refactoring**: Pay down critical technical debt (e.g., modularize CLI commands). `[Debt]` `[Bug]` `(Size: L)`
+### Maintenance
+- [ ] **Documentation**: Comprehensive README. `[Debt]` `(Size: S)` `[Risk: Low]`
+- [ ] **Refactoring**: Pay down critical technical debt. `[Debt]` `[Bug]` `(Size: L)` `[Risk: Medium]`
 
 ---
 
 ## 🚀 Phase 1: The Standard (Feature Parity)
 **Goal**: Competitiveness.
-**Risk**: Low
 **Dependencies**: Requires Phase 0.
+*Risk*: Low.
 
-### User Experience (UX)
-- [ ] **CLI Improvements**: Add interactive prompts and beautiful output formats. `[Feat]` `(Size: M)`
-- [ ] **Error Messages**: Provide actionable, user-friendly error messages for all failure modes. `[Bug]` `[Feat]` `(Size: S)`
+### Interface
+- [ ] **UX**: CLI improvements, Error messages. `[Feat]` `[Bug]` `(Size: M)` `[Risk: Low]`
 
-### Architecture & Capabilities
-- [ ] **Config**: Implement robust settings management with environment variable overrides. `[Feat]` `(Size: M)`
-- [ ] **Performance**: Introduce async operations and caching for network calls. `[Feat]` `[Debt]` `(Size: L)`
+### System
+- [ ] **Config**: Robust settings management. `[Feat]` `(Size: M)` `[Risk: Low]`
+- [ ] **Performance**: Async, Caching. `[Feat]` `[Debt]` `(Size: L)` `[Risk: Medium]`
 
 ---
 
 ## 🔌 Phase 2: The Ecosystem (Integration)
 **Goal**: Interoperability.
-**Risk**: Medium (Requires API design freeze).
 **Dependencies**: Requires Phase 1.
+*Risk*: Medium (Requires API design freeze).
 
-### Extensibility
-- [ ] **API**: Design and expose a REST/GraphQL API for external integrations. `[Feat]` `(Size: L)`
-- [ ] **Plugins**: Develop an extension system to allow community-driven plugins. `[Feat]` `(Size: L)`
+### Interfaces
+- [ ] **API**: REST/GraphQL. `[Feat]` `(Size: L)` `[Risk: Medium]`
+- [ ] **Plugins**: Extension system. `[Feat]` `(Size: L)` `[Risk: Medium]`
 
 ---
 
 ## 🔮 Phase 3: The Vision (Innovation)
 **Goal**: Market Leader.
-**Risk**: High (R&D).
 **Dependencies**: Requires Phase 2.
+*Risk*: High (R&D).
 
-### Next-Gen Features
-- [ ] **AI**: LLM Integration for intelligent recommendations and automated workflows. `[Feat]` `(Size: L)`
-- [ ] **Cloud**: Full native K8s/Docker support for distributed setups. `[Feat]` `(Size: M)`
+### Next-Gen
+- [ ] **AI**: LLM Integration. `[Feat]` `(Size: L)` `[Risk: High]`
+- [ ] **Cloud**: K8s/Docker. `[Feat]` `(Size: L)` `[Risk: High]`
