@@ -122,3 +122,13 @@ def update_registry_entry(
 
 def get_registry_entry(email: str) -> dict[str, Any] | None:
     return load_registry().get(email)
+
+
+def remove_registry_entry(email: str, dry_run: bool = False) -> bool:
+    registry = load_registry()
+    if email in registry:
+        if not dry_run:
+            del registry[email]
+            save_registry(registry)
+        return True
+    return False

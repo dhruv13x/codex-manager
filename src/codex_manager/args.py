@@ -737,4 +737,59 @@ def get_parser() -> argparse.ArgumentParser:
         help="Show what would happen without actually syncing.",
     )
 
+    purge_parser = subparsers.add_parser(
+        "purge",
+        help="Total Wipeout: Completely delete the Codex home directory (Auth, Identity, and all State).",
+    )
+    purge_parser.add_argument(
+        "--source-dir",
+        default=str(_get_default("codex_home", str(DEFAULT_CODEX_HOME))),
+        help="Codex home directory to purge.",
+    )
+    purge_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be removed without deleting anything.",
+    )
+    purge_parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Confirm the purge without prompting.",
+    )
+
+    remove_parser = subparsers.add_parser(
+        "remove",
+        help="Account Cleanup: Delete all local (and optionally cloud) backups and registry entries for a specific email.",
+    )
+    remove_parser.add_argument(
+        "--email",
+        required=True,
+        help="The email address of the account to remove.",
+    )
+    remove_parser.add_argument(
+        "--backup-dir",
+        default=str(_get_default("backup_dir", str(DEFAULT_BACKUP_DIR))),
+        help="Directory containing backup archives and metadata.",
+    )
+    remove_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Also remove backups and registry entries from Cloud (B2).",
+    )
+    remove_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be removed without deleting anything.",
+    )
+    remove_parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Confirm the removal without prompting.",
+    )
+    remove_parser.add_argument("--bucket", help="B2 Bucket Name")
+    remove_parser.add_argument("--b2-id", help="B2 Key ID")
+    remove_parser.add_argument("--b2-key", help="B2 App Key")
+
     return parser

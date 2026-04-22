@@ -8,6 +8,7 @@ try:
     from rich.panel import Panel
     from rich.status import Status
     from rich.table import Table
+    from rich.prompt import Confirm
 
     class Console:
         def __init__(self):
@@ -103,6 +104,20 @@ except ImportError:
                 lines.append(format_row(row))
 
             return "\n".join(lines)
+
+    class Confirm:
+        @staticmethod
+        def ask(prompt: str, default: bool = False) -> bool:
+            suffix = " (Y/n)" if default else " (y/N)"
+            # Strip rich tags for plain input
+            clean_prompt = re.sub(r'\[/?[a-zA-Z\s]+\]', '', prompt)
+            try:
+                result = input(f"{clean_prompt}{suffix}: ").strip().lower()
+                if not result:
+                    return default
+                return result in ("y", "yes")
+            except (EOFError, KeyboardInterrupt):
+                return False
 
 
     class Console:

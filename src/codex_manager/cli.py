@@ -17,6 +17,8 @@ from .doctor import run_doctor
 from .list_backups import BackupEntry, list_backups, list_cloud_backups, print_entries_table
 from .profile import export_profile, import_profile
 from .prune import perform_prune, prune_result_to_text
+from .purge import perform_purge, purge_result_to_text
+from .remove import perform_remove, remove_result_to_text
 from .prune_backups import perform_prune_backups
 from .recommend import choose_best_account
 from .registry import sync_registry_with_cloud
@@ -371,6 +373,17 @@ def handle_prune(args: Any) -> None:
     console.print(prune_result_to_text(plan, dry_run=args.dry_run, source_dir=source_dir))
 
 
+def handle_purge(args: Any) -> None:
+    source_dir = Path(args.source_dir).expanduser()
+    success = perform_purge(args)
+    console.print(purge_result_to_text(success, source_dir=source_dir, dry_run=args.dry_run))
+
+
+def handle_remove(args: Any) -> None:
+    results = perform_remove(args)
+    console.print(remove_result_to_text(results, email=args.email, dry_run=args.dry_run))
+
+
 def handle_use(args: Any) -> None:
     sync_current_account_status(args)
     _ensure_cloud_archive(args)
@@ -423,6 +436,8 @@ def main() -> None:
         "list-backups": handle_list_backups,
         "profile": handle_profile,
         "prune": handle_prune,
+        "purge": handle_purge,
+        "remove": handle_remove,
         "prune-backups": handle_prune_backups,
         "recommend": handle_recommend,
         "restore": handle_restore,

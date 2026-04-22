@@ -36,3 +36,5 @@ geminiai_cli/*
 
 .coverage
 coverage.xml
+foo.tar.gz
+.codex/
