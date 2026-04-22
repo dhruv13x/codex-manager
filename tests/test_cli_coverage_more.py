@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock
 import pytest
 
-from codex_manager.cli import handle_backup, handle_profile, handle_status, _ensure_cloud_archive, list_entries_from_args, _read_status_command_input
+from codex_manager.cli import (
+    _ensure_cloud_archive,
+    _read_status_command_input,
+    handle_status,
+    list_entries_from_args,
+)
 from codex_manager.status import TokenExpiredError
+
 
 def test_ensure_cloud_archive_no_cloud(capsys):
     class Args:

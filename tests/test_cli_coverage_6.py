@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock
+from datetime import datetime
+
 from codex_manager.cli import build_live_status
 from codex_manager.status import LiveStatus
-from datetime import datetime, timezone
+
 
 def test_build_live_status_with_live(mocker):
     class Args:

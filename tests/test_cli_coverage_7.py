@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import pytest
+import json
 from unittest.mock import MagicMock
+
+import pytest
+
 from codex_manager.cli import _read_status_command_input, handle_status
 from codex_manager.status import TokenExpiredError
-from pathlib import Path
-import json
+
 
 def test_read_status_command_input_status_command(mocker):
     class Args:

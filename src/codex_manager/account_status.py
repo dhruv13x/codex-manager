@@ -9,9 +9,8 @@ from typing import Any
 
 from .backup import read_status_text_from_args
 from .cloud import get_cloud_provider
-from .list_backups import list_backups, list_cloud_backups
+from .list_backups import list_cloud_backups
 from .registry import sync_registry_with_cloud, update_registry_entry
-from .status import parse_live_status_text
 from .ui import console
 from .utils import build_archive_name
 

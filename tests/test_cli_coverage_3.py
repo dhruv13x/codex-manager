@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock
-from codex_manager.cli import list_entries_from_args, _ensure_cloud_archive
-from codex_manager.list_backups import BackupEntry
-from pathlib import Path
+
+import pytest
+
+from codex_manager.cli import _ensure_cloud_archive, list_entries_from_args
+
 
 def test_list_entries_force_latest_no_cloud_but_force(mocker, tmp_path):
     class Args:
