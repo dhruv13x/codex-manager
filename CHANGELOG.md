@@ -1,5 +1,9 @@
 # Changelog
 
+## [7.0.0] - 2026-04-23
+### Other Changes
+- update
+
 ## [6.0.0] - 2026-04-22
 ### Features
 - make list-backups clean by default (latest per email) and add --all flag
