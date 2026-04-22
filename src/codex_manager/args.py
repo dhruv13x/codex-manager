@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from . import __version__
 
 from .config import (
     DEFAULT_BACKUP_DIR,
@@ -90,6 +91,12 @@ def get_parser() -> argparse.ArgumentParser:
         return config.get(key, fallback)
 
     parser = RichHelpParser(prog="codex-manager", description="Manage your Codex account snapshots and quotas.")
+    parser.add_argument(
+        "--version",
+        "-v",
+        action="version",
+        version=f"%(prog)s {__version__}",
+    )
     subparsers = parser.add_subparsers(dest="command")
 
     cooldown_parser = subparsers.add_parser(
