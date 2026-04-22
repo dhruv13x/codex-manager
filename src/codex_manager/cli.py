@@ -284,7 +284,13 @@ def handle_status(args: Any) -> None:
 
 
 def handle_backup(args: Any) -> None:
-    archive_path, metadata_path, metadata = perform_backup(args)
+    try:
+        archive_path, metadata_path, metadata = perform_backup(args)
+    except FileExistsError as exc:
+        console.print(f"[bold red]Stop:[/] {exc}")
+        console.print(f"[dim]Note: Backups are named after the account's weekly reset time.[/]")
+        console.print(f"[dim]If you want to update your current snapshot, run with: [bold white]--force[/][/]")
+        sys.exit(1)
 
     if getattr(args, "cloud", False):
         cp = get_cloud_provider(args)
