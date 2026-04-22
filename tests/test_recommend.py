@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from codex_manager.cooldown import CooldownStatus, evaluate_records
 from codex_manager.list_backups import BackupEntry
@@ -53,7 +54,6 @@ def test_choose_best_account_prefers_ready_and_live_first() -> None:
     assert recommendation.selected.email == "live@example.com"
 
 
-from unittest.mock import patch
 
 
 @patch("codex_manager.registry.load_registry", return_value={})

@@ -97,7 +97,7 @@ def capture_tmux_status_text(
     try:
         subprocess.run(["tmux", "-V"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
-        raise RuntimeError("tmux is not installed or not in PATH. It is required for live status capture.")
+        raise RuntimeError("tmux is not installed or not in PATH. It is required for live status capture.") from None
 
     # 2. Setup unique session name if not provided
     if session_name is None:

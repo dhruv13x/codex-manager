@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from codex_manager.cooldown import (
     CooldownStatus,
@@ -38,7 +39,6 @@ def test_evaluate_record_cooldown() -> None:
     assert status.remaining_seconds == 7200
 
 
-from unittest.mock import patch
 
 
 @patch("codex_manager.registry.load_registry", return_value={})

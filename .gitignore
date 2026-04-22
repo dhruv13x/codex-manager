@@ -34,3 +34,5 @@ build/
 .codex_sample/*
 geminiai_cli/*
 
+.coverage
+coverage.xml

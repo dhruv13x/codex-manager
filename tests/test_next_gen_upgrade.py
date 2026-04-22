@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -61,7 +61,7 @@ def test_sync_current_account_status_with_bypass(mock_args):
     # Verify metadata was updated with +7 days
     updated_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     
-    expected_reset = (now + timedelta(days=7)).isoformat()
+
     assert updated_metadata["email"] == "test@example.com"
     # Wait, quota_text might be missing if patch_metadata doesn't write it or writes default
 

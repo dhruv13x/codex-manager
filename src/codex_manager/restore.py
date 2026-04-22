@@ -63,7 +63,7 @@ def load_metadata_for_archive(archive_path: Path) -> dict:
                 raise FileNotFoundError(f"Failed to extract metadata member: {member_name}")
             return json.loads(extracted.read().decode("utf-8"))
     except (zlib.error, tarfile.TarError) as exc:
-        raise RuntimeError(f"Could not read metadata from archive (possibly corrupted): {exc}")
+        raise RuntimeError(f"Could not read metadata from archive (possibly corrupted): {exc}") from exc
 
 
 def validate_archive_contents(archive_path: Path) -> None:
