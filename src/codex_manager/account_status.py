@@ -205,14 +205,13 @@ def sync_current_account_status(args: Any) -> None:
         except Exception:
             pass
 
-    if not current_email:
-        console.print(
-            "[yellow]Warning:[/] Could not identify current account from auth.json. "
-            "Skipping pre-switch status sync."
-        )
-        return
-
     if getattr(args, "without_status_check", False):
+        if not current_email:
+            console.print(
+                "[yellow]Warning:[/] Could not identify current account from auth.json. "
+                "Skipping pre-switch status sync."
+            )
+            return
         now = datetime.now().astimezone()
         session_start_at = now
         reset_at = now + timedelta(days=7)
@@ -234,7 +233,10 @@ def sync_current_account_status(args: Any) -> None:
         )
         return
 
-    console.print(f"Syncing status for current account: [cyan]{current_email}[/]")
+    if current_email:
+        console.print(f"Syncing status for current account: [cyan]{current_email}[/]")
+    else:
+        console.print("Syncing status for current live account...")
 
     text = None
     from .status import TokenExpiredError
@@ -260,23 +262,29 @@ def sync_current_account_status(args: Any) -> None:
                     dry_run=getattr(args, "dry_run", False),
                 )
             except Exception:
-                # If we can't even get the email, we use the one from auth.json
-                patch_metadata(
-                    email=current_email,
-                    reset_at=None,
-                    quota_text="TOKEN EXPIRED: Re-login required.",
-                    quota_percent_left=None,
-                    args=args,
-                    is_expired=True,
-                    dry_run=getattr(args, "dry_run", False),
-                )
+                if current_email:
+                    patch_metadata(
+                        email=current_email,
+                        reset_at=None,
+                        quota_text="TOKEN EXPIRED: Re-login required.",
+                        quota_percent_left=None,
+                        args=args,
+                        is_expired=True,
+                        dry_run=getattr(args, "dry_run", False),
+                    )
+                else:
+                    console.print(
+                        "[bold red]Error:[/] Could not identify current account from live status or auth.json."
+                    )
+                    console.print("[dim]Use --without-status-check only when auth.json contains the active email.[/]")
             sys.exit(1)
         except Exception as exc:
             if attempt == 1:
                 console.print(f"[yellow]Status capture failed (attempt 1): {exc}. Try one more time...[/]")
             else:
+                account_label = current_email or "current live account"
                 console.print(
-                    f"[bold red]Error:[/] Status capture failed twice for [cyan]{current_email}[/]: {exc}"
+                    f"[bold red]Error:[/] Status capture failed twice for [cyan]{account_label}[/]: {exc}"
                 )
                 console.print("\n[bold yellow]Next-Gen Safety Protocol:[/]")
                 console.print("If Codex has changed its layout or status is unavailable, you MUST use:")
@@ -302,8 +310,9 @@ def sync_current_account_status(args: Any) -> None:
                 dry_run=getattr(args, "dry_run", False),
             )
         except Exception as exc:
+            account_label = current_email or "current live account"
             console.print(
-                f"[bold red]Error:[/] Failed to parse status for [cyan]{current_email}[/]: {exc}"
+                f"[bold red]Error:[/] Failed to parse status for [cyan]{account_label}[/]: {exc}"
             )
             console.print("[dim]Use --without-status-check if Codex layout has changed.[/]")
             sys.exit(1)

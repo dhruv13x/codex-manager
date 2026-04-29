@@ -78,15 +78,41 @@ def test_patch_metadata_expired_without_existing_metadata_sets_registry_times(mo
 
 
 
-def test_sync_current_account_status_no_email(tmp_path, capsys):
+def test_sync_current_account_status_without_status_check_no_email(tmp_path, capsys):
     class Args:
         dest_dir = str(tmp_path)
+        without_status_check = True
     args = Args()
 
     sync_current_account_status(args)
 
     captured = capsys.readouterr()
     assert "Could not identify current account from auth.json" in captured.out
+
+
+def test_sync_current_account_status_live_status_without_auth_email(mocker, tmp_path):
+    dest_dir = tmp_path / "codex"
+    dest_dir.mkdir()
+
+    class Args:
+        pass
+
+    args = Args()
+    args.dest_dir = str(dest_dir)
+    args.without_status_check = False
+    args.command = "use"
+    args.reference_year = 2026
+    args.dry_run = False
+
+    mocker.patch(
+        "codex_manager.account_status.read_status_text_from_args",
+        return_value="Email : live@example.com\nQuota : [░░░░░░░░░░░░░░░░░░░░] 0% left (resets 10:02 on 26 Apr)\n",
+    )
+    mock_patch = mocker.patch("codex_manager.account_status.patch_metadata")
+
+    sync_current_account_status(args)
+
+    assert mock_patch.call_args.kwargs["email"] == "live@example.com"
 
 
 def test_sync_current_account_status_token_expired(mocker, tmp_path, capsys):
