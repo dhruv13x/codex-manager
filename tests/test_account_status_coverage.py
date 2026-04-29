@@ -55,6 +55,28 @@ def test_patch_metadata_fallback_datetime_parsing(mocker, tmp_path) -> None:
     mock_update.assert_called_once()
 
 
+def test_patch_metadata_expired_without_existing_metadata_sets_registry_times(mocker, tmp_path) -> None:
+    class Args:
+        pass
+
+    args = Args()
+    args.backup_dir = str(tmp_path / "missing-backups")
+
+    mock_update = mocker.patch("codex_manager.account_status.update_registry_entry")
+
+    patch_metadata(
+        "expired@example.com",
+        quota_text="TOKEN EXPIRED: Re-login required.",
+        args=args,
+        is_expired=True,
+    )
+
+    call = mock_update.call_args.kwargs
+    assert call["is_expired"] is True
+    assert call["reset_at"] is not None
+    assert call["session_start_at"] is not None
+
+
 
 def test_sync_current_account_status_no_email(tmp_path, capsys):
     class Args:

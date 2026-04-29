@@ -30,6 +30,10 @@ def patch_metadata(
     # We will compute the final reset_at and session_start_at to save to registry
     final_reset_at = reset_at
     final_session_start_at = session_start_at
+    if is_expired and final_reset_at is None:
+        final_reset_at = datetime.now().astimezone()
+    if is_expired and final_session_start_at is None and final_reset_at is not None:
+        final_session_start_at = final_reset_at - timedelta(days=7)
 
     if backup_dir.exists():
         # Find any metadata file containing this email
@@ -151,15 +155,16 @@ def patch_metadata(
                     try:
                         cp.download_file(metadata_name, local_metadata)
                         data = json.loads(local_metadata.read_text(encoding="utf-8"))
-                        data["reset_at"] = (
-                            reset_at.isoformat() if hasattr(reset_at, "isoformat") else str(reset_at)
-                        )
-                        data["next_available_at"] = data["reset_at"]
-                        if session_start_at:
+                        if final_reset_at is not None:
+                            data["reset_at"] = (
+                                final_reset_at.isoformat() if hasattr(final_reset_at, "isoformat") else str(final_reset_at)
+                            )
+                            data["next_available_at"] = data["reset_at"]
+                        if final_session_start_at:
                             data["session_start_at"] = (
-                                session_start_at.isoformat()
-                                if hasattr(session_start_at, "isoformat")
-                                else str(session_start_at)
+                                final_session_start_at.isoformat()
+                                if hasattr(final_session_start_at, "isoformat")
+                                else str(final_session_start_at)
                             )
                         data["quota_text"] = quota_text
                         if quota_percent_left is not None:

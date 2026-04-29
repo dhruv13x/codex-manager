@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .list_backups import BackupEntry
 
@@ -67,10 +67,12 @@ def evaluate_records(
     current = now.astimezone() if now is not None else datetime.now().astimezone()
     
     for email, reg_entry in registry_data.items():
-        if "reset_at" not in reg_entry or "updated_at" not in reg_entry:
+        if "updated_at" not in reg_entry:
             continue
             
         reg_updated_at = parse_iso_datetime(reg_entry["updated_at"])
+        reg_reset_at = reg_entry.get("reset_at")
+        reg_is_expired = reg_entry.get("is_expired", False)
         
         # Check if we already have a status for this email from backups
         existing_idx = next((i for i, s in enumerate(statuses) if s.email == email), None)
@@ -79,8 +81,14 @@ def evaluate_records(
             existing_status = statuses[existing_idx]
             # If registry is newer, update the status
             if reg_updated_at > existing_status.quota_end_detected_at:
-                next_available_at = parse_iso_datetime(reg_entry["reset_at"])
-                session_start_at = parse_iso_datetime(reg_entry.get("session_start_at", reg_entry["reset_at"]))
+                if reg_reset_at is not None:
+                    next_available_at = parse_iso_datetime(reg_reset_at)
+                    session_start_at = parse_iso_datetime(reg_entry.get("session_start_at", reg_reset_at))
+                elif reg_is_expired:
+                    next_available_at = existing_status.next_available_at
+                    session_start_at = existing_status.session_start_at
+                else:
+                    continue
                 remaining_seconds = int((next_available_at - current).total_seconds())
                 statuses[existing_idx] = CooldownStatus(
                     email=email,
@@ -93,12 +101,18 @@ def evaluate_records(
                     remaining_seconds=max(0, remaining_seconds),
                     quota_text=reg_entry.get("quota_text"),
                     quota_percent_left=reg_entry.get("quota_percent_left"),
-                    is_expired=reg_entry.get("is_expired", False)
+                    is_expired=reg_is_expired
                 )
         else:
             # Create a new status from registry
-            next_available_at = parse_iso_datetime(reg_entry["reset_at"])
-            session_start_at = parse_iso_datetime(reg_entry.get("session_start_at", reg_entry["reset_at"]))
+            if reg_reset_at is not None:
+                next_available_at = parse_iso_datetime(reg_reset_at)
+                session_start_at = parse_iso_datetime(reg_entry.get("session_start_at", reg_reset_at))
+            elif reg_is_expired:
+                next_available_at = reg_updated_at
+                session_start_at = reg_updated_at - timedelta(days=7)
+            else:
+                continue
             remaining_seconds = int((next_available_at - current).total_seconds())
             statuses.append(
                 CooldownStatus(
@@ -112,7 +126,7 @@ def evaluate_records(
                     remaining_seconds=max(0, remaining_seconds),
                     quota_text=reg_entry.get("quota_text"),
                     quota_percent_left=reg_entry.get("quota_percent_left"),
-                    is_expired=reg_entry.get("is_expired", False)
+                    is_expired=reg_is_expired
                 )
             )
 

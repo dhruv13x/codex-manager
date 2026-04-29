@@ -83,6 +83,25 @@ def test_evaluate_records_merges_live_status(mock_reg) -> None:
     assert statuses[0].next_available_at.day == 20
 
 
+@patch(
+    "codex_manager.registry.load_registry",
+    return_value={
+        "expired@example.com": {
+            "updated_at": "2026-04-21T16:00:00+00:00",
+            "is_expired": True,
+            "quota_text": "TOKEN EXPIRED: Re-login required.",
+        }
+    },
+)
+def test_evaluate_records_includes_expired_registry_entries_without_reset_at(mock_reg) -> None:
+    statuses = evaluate_records([], now=datetime(2026, 4, 21, 16, 0, tzinfo=timezone.utc))
+    assert len(statuses) == 1
+    assert statuses[0].email == "expired@example.com"
+    assert statuses[0].validation_status == "registry"
+    assert statuses[0].is_expired is True
+    assert statuses[0].status == "ready"
+
+
 def test_format_remaining() -> None:
     assert format_remaining(0) == "now"
     assert format_remaining(5400) == "1h 30m"
