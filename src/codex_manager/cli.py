@@ -47,12 +47,11 @@ def list_entries_from_args(args: Any) -> list[BackupEntry]:
             )
         )
 
-    if getattr(args, "cloud", False) or force_latest:
+    if getattr(args, "cloud", False):
         cp = get_cloud_provider(args)
         if cp:
             # Sync registry (cooldown.json) when cloud is enabled
-            if getattr(args, "cloud", False):
-                sync_registry_with_cloud(cp)
+            sync_registry_with_cloud(cp)
 
             all_entries.extend(
                 list_cloud_backups(

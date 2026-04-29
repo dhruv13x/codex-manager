@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import pytest
+from unittest.mock import MagicMock
 
 from codex_manager.cli import (
     _ensure_cloud_archive,
     _read_status_command_input,
     handle_status,
+    handle_recommend,
     list_entries_from_args,
 )
 from codex_manager.status import TokenExpiredError
@@ -67,3 +69,27 @@ def test_handle_status_token_expired(mocker, capsys):
 
     with pytest.raises(SystemExit):
         handle_status(args)
+
+
+def test_handle_recommend_without_cloud_does_not_fetch_cloud(mocker, tmp_path):
+    class Args:
+        command = "recommend"
+        backup_dir = str(tmp_path)
+        cloud = False
+        live = False
+
+    args = Args()
+    mocker.patch("codex_manager.cli.list_backups", return_value=[])
+    mock_cloud = mocker.patch("codex_manager.cli.list_cloud_backups")
+    recommendation = MagicMock()
+    recommendation.selected.email = "test@example.com"
+    recommendation.selected.status = "ready"
+    recommendation.selected.remaining_seconds = 0
+    recommendation.selected.next_available_at.strftime.return_value = "2026-04-29 00:00:00 +0000"
+    recommendation.selected.validation_status = "backup"
+    recommendation.reason = "ready now"
+    mocker.patch("codex_manager.cli.choose_best_account", return_value=recommendation)
+
+    handle_recommend(args)
+
+    mock_cloud.assert_not_called()
