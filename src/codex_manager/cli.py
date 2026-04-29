@@ -207,6 +207,12 @@ def handle_recommend(args: Any) -> None:
         )
     )
 
+    if getattr(args, "use", False):
+        args.email = selected.email
+        args.from_archive = None
+        console.print(f"Switching to recommended account: [cyan]{selected.email}[/]")
+        handle_use(args)
+
 
 def _read_status_command_input(args: Any) -> str:
     if args.input_file:

@@ -120,6 +120,33 @@ def test_main_recommend(monkeypatch):
             mock_choose.return_value = recommendation
             main()
 
+def test_main_recommend_use(monkeypatch):
+    monkeypatch.setattr(sys, 'argv', ['codex-manager', 'recommend', '--use'])
+    with patch('codex_manager.cli.list_backups') as _mock:
+        from codex_manager.list_backups import BackupEntry
+        entry = BackupEntry(
+            archive_path=MagicMock(),
+            email="test",
+            session_start_at="2026-04-19T10:02:00+00:00",
+            reset_at="2026-04-26T10:02:00+00:00",
+            created_at="2026-04-20T10:02:00+00:00",
+            quota_text="q",
+            quota_percent_left=0
+        )
+        _mock.return_value = [entry]
+        with patch('codex_manager.cli.choose_best_account') as mock_choose:
+            recommendation = MagicMock()
+            recommendation.selected.email = "test@example.com"
+            recommendation.selected.status = "ready"
+            recommendation.selected.remaining_seconds = 0
+            recommendation.selected.next_available_at.strftime.return_value = "2026-04-29 00:00:00 +0000"
+            recommendation.selected.validation_status = "backup"
+            recommendation.reason = "ready now"
+            mock_choose.return_value = recommendation
+            with patch('codex_manager.cli.handle_use') as mock_handle_use:
+                main()
+                mock_handle_use.assert_called_once()
+
 def test_main_cooldown(monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['codex-manager', 'cooldown'])
     with patch('codex_manager.cli.list_backups') as _mock:

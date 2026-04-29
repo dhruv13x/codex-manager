@@ -93,3 +93,30 @@ def test_handle_recommend_without_cloud_does_not_fetch_cloud(mocker, tmp_path):
     handle_recommend(args)
 
     mock_cloud.assert_not_called()
+
+
+def test_handle_recommend_use_delegates_to_handle_use(mocker, tmp_path):
+    class Args:
+        command = "recommend"
+        backup_dir = str(tmp_path)
+        cloud = False
+        live = False
+        use = True
+        email = None
+
+    args = Args()
+    mocker.patch("codex_manager.cli.list_backups", return_value=[])
+    recommendation = MagicMock()
+    recommendation.selected.email = "switch@example.com"
+    recommendation.selected.status = "ready"
+    recommendation.selected.remaining_seconds = 0
+    recommendation.selected.next_available_at.strftime.return_value = "2026-04-29 00:00:00 +0000"
+    recommendation.selected.validation_status = "backup"
+    recommendation.reason = "ready now"
+    mocker.patch("codex_manager.cli.choose_best_account", return_value=recommendation)
+    mock_use = mocker.patch("codex_manager.cli.handle_use")
+
+    handle_recommend(args)
+
+    assert args.email == "switch@example.com"
+    mock_use.assert_called_once_with(args)
