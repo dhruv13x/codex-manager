@@ -120,3 +120,31 @@ def test_handle_recommend_use_delegates_to_handle_use(mocker, tmp_path):
 
     assert args.email == "switch@example.com"
     mock_use.assert_called_once_with(args)
+
+
+def test_handle_recommend_restore_delegates_to_handle_restore(mocker, tmp_path):
+    class Args:
+        command = "recommend"
+        backup_dir = str(tmp_path)
+        cloud = False
+        live = False
+        use = False
+        restore = True
+        email = None
+
+    args = Args()
+    mocker.patch("codex_manager.cli.list_backups", return_value=[])
+    recommendation = MagicMock()
+    recommendation.selected.email = "restore@example.com"
+    recommendation.selected.status = "ready"
+    recommendation.selected.remaining_seconds = 0
+    recommendation.selected.next_available_at.strftime.return_value = "2026-04-29 00:00:00 +0000"
+    recommendation.selected.validation_status = "backup"
+    recommendation.reason = "ready now"
+    mocker.patch("codex_manager.cli.choose_best_account", return_value=recommendation)
+    mock_restore = mocker.patch("codex_manager.cli.handle_restore")
+
+    handle_recommend(args)
+
+    assert args.email == "restore@example.com"
+    mock_restore.assert_called_once_with(args)

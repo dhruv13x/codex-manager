@@ -231,27 +231,32 @@ def get_parser() -> argparse.ArgumentParser:
     recommend_parser.add_argument(
         "--use",
         action="store_true",
-        help="Immediately switch to the recommended account using the same workflow as `cm use`.",
+        help="Immediately switch to the recommended account (fast auth-only switch).",
+    )
+    recommend_parser.add_argument(
+        "--restore",
+        action="store_true",
+        help="Immediately restore the recommended account's full backup.",
     )
     recommend_parser.add_argument(
         "--dest-dir",
         default=str(_get_default("codex_home", str(DEFAULT_CODEX_HOME))),
-        help="Codex home directory to restore into when used with --use.",
+        help="Codex home directory to restore into when used with --use or --restore.",
     )
     recommend_parser.add_argument(
         "--without-status-check",
         action="store_true",
-        help="Skip current account status capture before switching when used with --use.",
+        help="Skip current account status capture before switching when used with --use or --restore.",
     )
     recommend_parser.add_argument(
         "--clean",
         action="store_true",
-        help="Prune runtime state and then do a full restore for a clean start when used with --use.",
+        help="Prune runtime state and then do a full restore for a clean start when used with --use (implied by --restore).",
     )
     recommend_parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would happen without switching when used with --use.",
+        help="Show what would happen without switching when used with --use or --restore.",
     )
     recommend_parser.add_argument(
         "--force",

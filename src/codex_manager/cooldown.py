@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from .list_backups import BackupEntry
 
@@ -21,11 +22,22 @@ class CooldownStatus:
     is_expired: bool = False
 
 
-def parse_iso_datetime(value: str) -> datetime:
-    dt = datetime.fromisoformat(value)
-    if dt.tzinfo is None:
-        return dt.astimezone()
-    return dt
+def parse_iso_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    
+    val_str = str(value).strip()
+    if not val_str or val_str.lower() in ("none", "unknown", "null"):
+        # Default to epoch if unknown
+        return datetime.fromtimestamp(0).astimezone()
+
+    try:
+        dt = datetime.fromisoformat(val_str)
+        if dt.tzinfo is None:
+            return dt.astimezone()
+        return dt
+    except ValueError:
+        return datetime.fromtimestamp(0).astimezone()
 
 
 def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownStatus:

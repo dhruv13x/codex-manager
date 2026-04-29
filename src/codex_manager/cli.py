@@ -207,7 +207,12 @@ def handle_recommend(args: Any) -> None:
         )
     )
 
-    if getattr(args, "use", False):
+    if getattr(args, "restore", False):
+        args.email = selected.email
+        args.from_archive = None
+        console.print(f"Restoring recommended account: [cyan]{selected.email}[/]")
+        handle_restore(args)
+    elif getattr(args, "use", False):
         args.email = selected.email
         args.from_archive = None
         console.print(f"Switching to recommended account: [cyan]{selected.email}[/]")

@@ -121,10 +121,10 @@ def list_cloud_backups(
         from datetime import datetime
         now = datetime.now().astimezone()
         def is_ready(entry: BackupEntry) -> bool:
-            if entry.reset_at == "unknown":
+            if not entry.reset_at or str(entry.reset_at).lower() in ("unknown", "none"):
                 return False
             try:
-                reset_time = datetime.fromisoformat(entry.reset_at)
+                reset_time = datetime.fromisoformat(str(entry.reset_at))
                 return reset_time <= now
             except ValueError:
                 return False
@@ -168,11 +168,11 @@ def list_backups(
         import codex_manager.list_backups  # For mocking
         now = getattr(codex_manager.list_backups, "datetime", datetime).now().astimezone()
         def is_ready(entry: BackupEntry) -> bool:
-            if entry.reset_at == "unknown":
+            if not entry.reset_at or str(entry.reset_at).lower() in ("unknown", "none"):
                 return False
             try:
                 dt = getattr(codex_manager.list_backups, "datetime", datetime)
-                reset_time = dt.fromisoformat(entry.reset_at)
+                reset_time = dt.fromisoformat(str(entry.reset_at))
                 return reset_time <= now
             except ValueError:
                 return False

@@ -17,8 +17,9 @@ def test_evaluate_entry_missing_times():
         quota_percent_left=None,
         quota_text="q"
     )
-    with pytest.raises(ValueError):
-        evaluate_entry(entry)
+    res = evaluate_entry(entry)
+    assert res.status == "ready"
+    assert res.next_available_at.year == 1970
 
 def test_evaluate_entry_cooldown():
     from codex_manager.list_backups import BackupEntry

@@ -19,6 +19,7 @@ def choose_best_account(statuses: list[CooldownStatus]) -> Recommendation:
         statuses,
         key=lambda item: (
             item.status != "ready",
+            item.is_expired,
             item.validation_status != "live",
             item.next_available_at if item.status != "ready" else item.session_start_at,
             item.email,
@@ -26,15 +27,23 @@ def choose_best_account(statuses: list[CooldownStatus]) -> Recommendation:
     )
 
     if selected.status == "ready":
-        if selected.validation_status == "live":
+        if selected.is_expired:
+            reason = "Ready now, but requires re-login (token expired)."
+        elif selected.validation_status == "live":
             reason = "Ready now from live Codex status."
         else:
             reason = "Ready now from backup metadata."
     else:
-        reason = (
-            "No account is ready. This account becomes available first in "
-            f"{format_remaining(selected.remaining_seconds)}."
-        )
+        if selected.is_expired:
+            reason = (
+                "No account is ready. This account (token expired) becomes available first in "
+                f"{format_remaining(selected.remaining_seconds)}."
+            )
+        else:
+            reason = (
+                "No account is ready. This account becomes available first in "
+                f"{format_remaining(selected.remaining_seconds)}."
+            )
 
     return Recommendation(selected=selected, reason=reason)
 
