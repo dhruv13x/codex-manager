@@ -149,7 +149,7 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
         if auth_path.exists():
             safety_dir = CODEX_MANAGER_HOME / "safety_backups"
             safety_dir.mkdir(parents=True, exist_ok=True)
-            current_email = identify_auth_email(auth_path)
+            current_email = getattr(args, "current_account_email", None) or identify_auth_email(auth_path)
             email_label = _safe_backup_label(current_email) if current_email else "unknown"
             existing_backup_path = safety_dir / (
                 f"auth.json.{email_label}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"

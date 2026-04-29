@@ -231,6 +231,7 @@ def sync_current_account_status(args: Any) -> None:
             session_start_at=session_start_at,
             dry_run=getattr(args, "dry_run", False),
         )
+        args.current_account_email = current_email
         return
 
     if current_email:
@@ -261,6 +262,7 @@ def sync_current_account_status(args: Any) -> None:
                     is_expired=True,
                     dry_run=getattr(args, "dry_run", False),
                 )
+                args.current_account_email = status.email
             except Exception:
                 if current_email:
                     patch_metadata(
@@ -272,6 +274,7 @@ def sync_current_account_status(args: Any) -> None:
                         is_expired=True,
                         dry_run=getattr(args, "dry_run", False),
                     )
+                    args.current_account_email = current_email
                 else:
                     console.print(
                         "[bold red]Error:[/] Could not identify current account from live status or auth.json."
@@ -309,6 +312,7 @@ def sync_current_account_status(args: Any) -> None:
                 is_expired=status.is_expired,
                 dry_run=getattr(args, "dry_run", False),
             )
+            args.current_account_email = status.email
         except Exception as exc:
             account_label = current_email or "current live account"
             console.print(
