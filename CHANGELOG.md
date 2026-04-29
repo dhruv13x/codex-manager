@@ -1,5 +1,9 @@
 # Changelog
 
+## [12.0.0] - 2026-04-29
+### Other Changes
+- update
+
 ## [11.0.0] - 2026-04-29
 ### Other Changes
 - update
