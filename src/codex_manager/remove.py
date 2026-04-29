@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 from .cloud import B2Provider
-from .registry import remove_registry_entry, sync_registry_with_cloud
+from .registry import remove_registry_entry, sync_registry_with_cloud, upload_registry_to_cloud
 from .ui import console, Confirm
 
 
@@ -37,6 +36,10 @@ def perform_remove(args: Any) -> dict[str, Any]:
         from .cloud import get_cloud_provider
         cp = get_cloud_provider(args)
         if cp:
+            if not dry_run:
+                # Pull latest remote registry first so the final overwrite preserves
+                # unrelated accounts while allowing true deletion for this email.
+                sync_registry_with_cloud(cp)
             all_cloud_files = cp.list_files()
             for f in all_cloud_files:
                 if email in f.name and (f.name.endswith(".tar.gz") or f.name.endswith(".metadata.json")):
@@ -72,12 +75,8 @@ def perform_remove(args: Any) -> dict[str, Any]:
                 cp.delete_file(filename)
             results["cloud_files_removed"].append(filename)
         
-        # To remove from cloud registry, we sync (which merges) then we'd need a way to 
-        # actually ensure it's GONE from the cloud version if it exists there.
-        # sync_registry_with_cloud currently merges. To force removal, we might need 
-        # to ensure the cloud registry is overwritten with our local one that has it removed.
         if not dry_run:
-            sync_registry_with_cloud(cp)
+            upload_registry_to_cloud(cp)
             results["cloud_registry_removed"] = True
         else:
             results["cloud_registry_removed"] = True

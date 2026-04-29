@@ -85,6 +85,27 @@ def sync_registry_with_cloud(cp: B2Provider, dry_run: bool = False) -> None:
             console.print(f"[yellow]Warning:[/] Failed to upload registry to cloud: {exc}")
 
 
+def upload_registry_to_cloud(cp: B2Provider, *, dry_run: bool = False) -> None:
+    """Upload the current local registry to cloud without performing a merge."""
+    from .ui import console
+    import tempfile
+
+    remote_path = "cooldown.json"
+    local_data = load_registry()
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / "cooldown.json"
+        tmp_path.write_text(json.dumps(local_data, indent=2), encoding="utf-8")
+        try:
+            if not dry_run:
+                cp.upload_file(tmp_path, remote_path)
+                console.print("[green]Cloud registry updated.[/]")
+            else:
+                console.print(f"Would upload registry to cloud: {remote_path}")
+        except Exception as exc:
+            console.print(f"[yellow]Warning:[/] Failed to upload registry to cloud: {exc}")
+
+
 def update_registry_entry(
     email: str,
     *,
