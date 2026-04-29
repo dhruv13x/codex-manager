@@ -1,5 +1,9 @@
 # Changelog
 
+## [13.0.0] - 2026-04-29
+### Features
+- add recommend --restore, fix cooldown crash, and prioritize non-expired accounts
+
 ## [12.0.0] - 2026-04-29
 ### Other Changes
 - update
