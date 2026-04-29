@@ -44,7 +44,7 @@ def test_use_preserve_mode_restores_latest_for_email(tmp_path: Path) -> None:
     create_sample_backup(tmp_path)
     dest_dir = tmp_path / "dest"
     dest_dir.mkdir()
-    (dest_dir / "auth.json").write_text("old", encoding="utf-8")
+    (dest_dir / "auth.json").write_text('{"email":"old@example.com","token":"old"}', encoding="utf-8")
     (dest_dir / "history.jsonl").write_text("runtime", encoding="utf-8")
     (dest_dir / "cache").mkdir()
 
@@ -61,7 +61,9 @@ def test_use_preserve_mode_restores_latest_for_email(tmp_path: Path) -> None:
     _, _, metadata, previous, pruned = perform_use(args)
     assert metadata["email"] == "letsmaildhruv@gmail.com"
     assert previous is not None
-    assert "auth.json.bak" in str(previous)
+    assert "auth.json." in previous.name
+    assert ".bak-" in previous.name
+    assert "old@example.com" in previous.name
     assert pruned is False
     assert (dest_dir / "auth.json").read_text(encoding="utf-8") == '{"token":"x"}'
     assert (dest_dir / "history.jsonl").read_text(encoding="utf-8") == "runtime"

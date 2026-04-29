@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tarfile
 import tempfile
@@ -8,6 +9,20 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import CODEX_MANAGER_HOME
+
+
+def _safe_backup_label(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9@._-]+", "_", value).strip("._-") or "unknown"
+
+
+def identify_auth_email(auth_path: Path) -> str | None:
+    try:
+        data = json.loads(auth_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    email = data.get("email")
+    return email if isinstance(email, str) and email.strip() else None
 
 
 def resolve_archive_path(args) -> Path:
@@ -134,7 +149,11 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
         if auth_path.exists():
             safety_dir = CODEX_MANAGER_HOME / "safety_backups"
             safety_dir.mkdir(parents=True, exist_ok=True)
-            existing_backup_path = safety_dir / f"auth.json.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            current_email = identify_auth_email(auth_path)
+            email_label = _safe_backup_label(current_email) if current_email else "unknown"
+            existing_backup_path = safety_dir / (
+                f"auth.json.{email_label}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            )
             shutil.copy2(auth_path, existing_backup_path)
         
         with tarfile.open(archive_path, "r:gz") as tar:

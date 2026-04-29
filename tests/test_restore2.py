@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from codex_manager.restore import (
+    identify_auth_email,
     latest_backup_archive,
     load_metadata_for_archive,
     move_existing_target,
@@ -69,6 +70,18 @@ def test_validate_archive_contents_fail(mock_tar_open, tmp_path):
 
 def test_move_existing_target_none(tmp_path):
     assert move_existing_target(tmp_path / "missing") is None
+
+
+def test_identify_auth_email(tmp_path):
+    auth_path = tmp_path / "auth.json"
+    auth_path.write_text('{"email":"test@example.com"}', encoding="utf-8")
+    assert identify_auth_email(auth_path) == "test@example.com"
+
+
+def test_identify_auth_email_invalid(tmp_path):
+    auth_path = tmp_path / "auth.json"
+    auth_path.write_text("invalid", encoding="utf-8")
+    assert identify_auth_email(auth_path) is None
 
 def test_restore_result_to_text():
     res = restore_result_to_text(Path("a"), Path("b"), {"email": "c", "session_start_at": "d", "reset_at": "e", "quota_text": "f"}, Path("g"), dry_run=True)
