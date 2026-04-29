@@ -109,11 +109,14 @@ def capture_tmux_status_text(
     if has_session:
         run_command(["tmux", "kill-session", "-t", session_name], check=False)
 
-    run_command(
+    session = run_command(
         [
             "tmux",
             "new-session",
             "-d",
+            "-P",
+            "-F",
+            "#{pane_id}",
             "-s",
             session_name,
             "-x",
@@ -123,12 +126,16 @@ def capture_tmux_status_text(
             codex_command,
         ]
     )
+    pane_id = session.stdout.strip()
+    if not pane_id:
+        raise RuntimeError("tmux did not return a pane id for the temporary capture session.")
+    run_command(["tmux", "set-option", "-t", session_name, "remain-on-exit", "on"])
 
     try:
         start = time.time()
         with console.status("[cyan]Waiting for Codex prompt...[/cyan]", spinner="dots"):
             while True:
-                output = run_command(["tmux", "capture-pane", "-t", session_name, "-p"]).stdout
+                output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
                 if "›" in output:
                     break
                 
@@ -136,13 +143,13 @@ def capture_tmux_status_text(
                     raise RuntimeError("Timed out waiting for Codex prompt.")
                 time.sleep(0.5)
 
-        run_command(["tmux", "send-keys", "-t", session_name, "/status", "Enter"])
+        run_command(["tmux", "send-keys", "-t", pane_id, "/status", "Enter"])
 
         start = time.time()
         last_retry = start
         with console.status("[cyan]Checking Codex status...[/cyan]", spinner="dots"):
             while True:
-                output = run_command(["tmux", "capture-pane", "-t", session_name, "-p"]).stdout
+                output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
                 
                 # If we have the full panel, return it
                 if "Account:" in output and "Weekly limit:" in output:
@@ -163,7 +170,7 @@ def capture_tmux_status_text(
 
                 # Periodic retry of /status if it seems stuck or refreshing
                 if time.time() - last_retry > 5.0:
-                    run_command(["tmux", "send-keys", "-t", session_name, "/status", "Enter"])
+                    run_command(["tmux", "send-keys", "-t", pane_id, "/status", "Enter"])
                     last_retry = time.time()
                 
                 time.sleep(0.5)

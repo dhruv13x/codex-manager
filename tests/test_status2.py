@@ -56,6 +56,8 @@ def test_capture_tmux_status_text_timeout(mock_sleep, mock_run):
 @patch("codex_manager.status.time.sleep")
 def test_capture_tmux_status_text_success(mock_sleep, mock_run):
     def mock_run_side_effect(args, **kwargs):
+        if args[:3] == ["tmux", "new-session", "-d"]:
+            return MagicMock(stdout="%42")
         if "capture-pane" in args:
             # We need to simulate the prompt '›' appearing, then the status appearing.
             # Let's count how many times capture-pane is called
@@ -72,11 +74,16 @@ def test_capture_tmux_status_text_success(mock_sleep, mock_run):
     mock_run.side_effect = mock_run_side_effect
     res = capture_tmux_status_text(startup_timeout_seconds=1.0, status_timeout_seconds=1.0)
     assert "Account: a@b.com" in res
+    capture_targets = [call.args[0] for call in mock_run.call_args_list if "capture-pane" in call.args[0]]
+    assert capture_targets
+    assert all("%42" in args for args in capture_targets)
 
 @patch("codex_manager.status.run_command")
 @patch("codex_manager.status.time.sleep")
 def test_capture_tmux_status_text_retry_and_timeout(mock_sleep, mock_run):
     def mock_run_side_effect(args, **kwargs):
+        if args[:3] == ["tmux", "new-session", "-d"]:
+            return MagicMock(stdout="%42")
         if "capture-pane" in args:
             # First phase: '›'
             # Second phase: status timeout
@@ -97,6 +104,19 @@ def test_capture_tmux_status_text_retry_and_timeout(mock_sleep, mock_run):
     with patch("codex_manager.status.time.time", side_effect=[1, 1, 7, 8]):
         with pytest.raises(RuntimeError):
             capture_tmux_status_text(startup_timeout_seconds=10.0, status_timeout_seconds=5.0)
+
+
+@patch("codex_manager.status.run_command")
+@patch("codex_manager.status.time.sleep")
+def test_capture_tmux_status_text_requires_pane_id(mock_sleep, mock_run):
+    def mock_run_side_effect(args, **kwargs):
+        if args[:3] == ["tmux", "new-session", "-d"]:
+            return MagicMock(stdout="")
+        return MagicMock()
+
+    mock_run.side_effect = mock_run_side_effect
+    with pytest.raises(RuntimeError, match="pane id"):
+        capture_tmux_status_text(startup_timeout_seconds=1.0, status_timeout_seconds=1.0)
 
 @patch("codex_manager.status.subprocess.run")
 def test_run_command_fail(mock_run):
