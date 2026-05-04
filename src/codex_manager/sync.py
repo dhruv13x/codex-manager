@@ -33,6 +33,17 @@ def push_backup(
 ) -> None:
     s3 = _get_s3_client(endpoint_url, access_key, secret_key)
 
+    # Fetch remote state
+    remote_files = {}
+    try:
+        response = s3.list_objects_v2(Bucket=bucket_name)
+        if "Contents" in response:
+            for obj in response["Contents"]:
+                remote_files[obj["Key"]] = obj["Size"]
+    except ClientError as e:
+        console.print(f"[bold red]Failed to list remote bucket {bucket_name}: {e}[/]", stderr=True)
+        return
+
     # Push all tar.gz and metadata.json files
     backup_files = sorted(list(backup_dir.glob("*.tar.gz")) + list(backup_dir.glob("*.metadata.json")))
 
@@ -41,6 +52,11 @@ def push_backup(
             continue
 
         object_name = file_path.name
+        
+        # Check if file exists and has the same size
+        if object_name in remote_files and remote_files[object_name] == file_path.stat().st_size:
+            console.print(f"Skipping {file_path.name}, already exists in cloud with same size.")
+            continue
 
         if dry_run:
             console.print(f"Would push {file_path.name} to s3://{bucket_name}/{object_name}")

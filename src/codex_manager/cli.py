@@ -83,7 +83,27 @@ def list_entries_from_args(args: Any) -> list[BackupEntry]:
                     seen_emails[entry.email] = replace(existing, source="both")
         return list(seen_emails.values())
 
-    return all_entries
+    # Deduplicate by archive filename to avoid showing identical local+cloud entries twice
+    unique_entries = {}
+    for entry in all_entries:
+        # Normalize the key to the archive name, so standalone metadata files
+        # merge correctly with their corresponding archive files.
+        name = entry.archive_path.name
+        key = name.replace(".metadata.json", ".tar.gz")
+        
+        if key not in unique_entries:
+            unique_entries[key] = entry
+        else:
+            existing = unique_entries[key]
+            # Prefer the entry that actually points to a .tar.gz over .metadata.json
+            if existing.archive_path.name.endswith(".metadata.json") and entry.archive_path.name.endswith(".tar.gz"):
+                new_entry = replace(entry, source="both" if existing.source != entry.source else entry.source)
+                unique_entries[key] = new_entry
+            else:
+                if existing.source != entry.source:
+                    unique_entries[key] = replace(existing, source="both")
+    
+    return list(unique_entries.values())
 
 
 def _ensure_cloud_archive(args: Any) -> None:
@@ -363,6 +383,8 @@ def handle_prune_backups(args: Any) -> None:
         keep=args.keep,
         keep_latest_per_email=args.keep_latest_per_email,
         dry_run=args.dry_run,
+        cloud=getattr(args, "cloud", False),
+        args=args,
     )
 
 
@@ -421,23 +443,55 @@ def handle_use(args: Any) -> None:
 
 
 def handle_sync(args: Any) -> None:
+    from .credentials import resolve_b2_credentials
+    import sys
+
     backup_dir = Path(args.backup_dir).expanduser()
+    bucket_name = args.bucket_name
+    access_key = args.access_key
+    secret_key = args.secret_key
+    endpoint_url = args.endpoint_url
+    
+    b2_id, b2_key, b2_bucket = resolve_b2_credentials(args)
+
+    if not bucket_name:
+        bucket_name = b2_bucket
+    if not access_key:
+        access_key = b2_id
+    if not secret_key:
+        secret_key = b2_key
+
+    # Auto-discover Backblaze B2 S3 endpoint if missing but credentials are set
+    if not endpoint_url and access_key and secret_key and access_key == b2_id:
+        try:
+            from b2sdk.v2 import InMemoryAccountInfo, B2Api
+            info = InMemoryAccountInfo()
+            api = B2Api(info)
+            api.authorize_account('production', b2_id, b2_key)
+            endpoint_url = info.get_s3_api_url()
+        except Exception:
+            pass
+
+    if not bucket_name:
+        console.print("[bold red]Error:[/] --bucket-name is required or must be configured via environment/Doppler (e.g. CODEX_B2_BUCKET)", stderr=True)
+        sys.exit(1)
+
     if args.direction == "push":
         push_backup(
             backup_dir=backup_dir,
-            bucket_name=args.bucket_name,
-            endpoint_url=args.endpoint_url,
-            access_key=args.access_key,
-            secret_key=args.secret_key,
+            bucket_name=bucket_name,
+            endpoint_url=endpoint_url,
+            access_key=access_key,
+            secret_key=secret_key,
             dry_run=args.dry_run,
         )
     elif args.direction == "pull":
         pull_backup(
             backup_dir=backup_dir,
-            bucket_name=args.bucket_name,
-            endpoint_url=args.endpoint_url,
-            access_key=args.access_key,
-            secret_key=args.secret_key,
+            bucket_name=bucket_name,
+            endpoint_url=endpoint_url,
+            access_key=access_key,
+            secret_key=secret_key,
             dry_run=args.dry_run,
         )
 

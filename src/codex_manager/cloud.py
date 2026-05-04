@@ -57,8 +57,15 @@ class B2Provider:
         return files
 
     def delete_file(self, remote_path: str) -> None:
-        file_version = self.bucket.get_file_info_by_name(remote_path)
-        self.bucket.delete_file_version(file_version.id_, remote_path)
+        try:
+            # Delete all versions of the file to completely remove it from B2
+            for v in self.bucket.list_file_versions(remote_path):
+                self.bucket.delete_file_version(v.id_, remote_path)
+        except Exception as e:
+            # list_file_versions handles FileNotPresent safely by returning empty list
+            # We catch any other potential API errors to avoid breaking the prune loop
+            from .ui import console
+            console.print(f"[yellow]Warning:[/] Failed to fully delete {remote_path}: {e}")
 
 def get_cloud_provider(args: Any = None) -> B2Provider | None:
     key_id, app_key, bucket = resolve_b2_credentials(args)

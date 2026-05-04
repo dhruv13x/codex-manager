@@ -90,29 +90,79 @@ def list_cloud_backups(
     sort_by: str = "created_at",
 ) -> list[BackupEntry]:
     cloud_files = cloud.list_files()
-    metadata_files = [f for f in cloud_files if f.name.endswith(".metadata.json")]
     
+    # Map base names to their cloud files to handle orphans
+    base_to_files = {}
+    for f in cloud_files:
+        if f.name.endswith("-latest-codex.tar.gz"):
+            continue
+        
+        if f.name.endswith(".tar.gz"):
+            base = f.name[:-7]
+            base_to_files.setdefault(base, {})["archive"] = f
+        elif f.name.endswith(".metadata.json"):
+            base = f.name[:-14]
+            base_to_files.setdefault(base, {})["metadata"] = f
+
     entries = []
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        for mf in metadata_files:
-            local_mf = tmp_path / mf.name
-            try:
-                cloud.download_file(mf.name, local_mf)
-                metadata = json.loads(local_mf.read_text())
+        for base, files in base_to_files.items():
+            metadata_file = files.get("metadata")
+            archive_file = files.get("archive")
+            
+            archive_name = archive_file.name if archive_file else (base + ".tar.gz")
+            
+            if metadata_file:
+                local_mf = tmp_path / metadata_file.name
+                try:
+                    cloud.download_file(metadata_file.name, local_mf)
+                    metadata = json.loads(local_mf.read_text())
+                    entries.append(BackupEntry(
+                        archive_path=Path(metadata.get("archive_name", archive_name)),
+                        email=metadata.get("email", "unknown"),
+                        session_start_at=metadata.get("session_start_at", "unknown"),
+                        reset_at=metadata.get("reset_at", "unknown"),
+                        created_at=metadata.get("created_at", "unknown"),
+                        quota_percent_left=metadata.get("quota_percent_left"),
+                        quota_text=metadata.get("quota_text", "unknown"),
+                        source="cloud",
+                        is_expired=metadata.get("is_expired", False),
+                    ))
+                except Exception:
+                    # Fallback if metadata download/parse fails
+                    parts = base.split("-")
+                    extracted_email = "unknown"
+                    if len(parts) >= 5 and base.endswith("-codex"):
+                        extracted_email = "-".join(parts[4:-1])
+                    entries.append(BackupEntry(
+                        archive_path=Path(archive_name),
+                        email=extracted_email,
+                        session_start_at="unknown",
+                        reset_at="unknown",
+                        created_at="-".join(parts[:4]) if len(parts) >= 4 else "unknown",
+                        quota_percent_left=None,
+                        quota_text="unknown",
+                        source="cloud",
+                        is_expired=False,
+                    ))
+            elif archive_file:
+                # ORPHAN ARCHIVE: Extract details from filename
+                parts = base.split("-")
+                extracted_email = "unknown"
+                if len(parts) >= 5 and base.endswith("-codex"):
+                    extracted_email = "-".join(parts[4:-1])
                 entries.append(BackupEntry(
-                    archive_path=Path(metadata.get("archive_name", mf.name.replace(".metadata.json", ".tar.gz"))),
-                    email=metadata.get("email", "unknown"),
-                    session_start_at=metadata.get("session_start_at", "unknown"),
-                    reset_at=metadata.get("reset_at", "unknown"),
-                    created_at=metadata.get("created_at", "unknown"),
-                    quota_percent_left=metadata.get("quota_percent_left"),
-                    quota_text=metadata.get("quota_text", "unknown"),
+                    archive_path=Path(archive_name),
+                    email=extracted_email,
+                    session_start_at="unknown",
+                    reset_at="unknown",
+                    created_at="-".join(parts[:4]) if len(parts) >= 4 else "unknown",
+                    quota_percent_left=None,
+                    quota_text="unknown",
                     source="cloud",
-                    is_expired=metadata.get("is_expired", False),
+                    is_expired=False,
                 ))
-            except Exception:
-                continue
 
     if email is not None:
         entries = [entry for entry in entries if entry.email == email]

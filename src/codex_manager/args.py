@@ -600,6 +600,14 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show what would be removed without deleting anything.",
     )
+    prune_backups_parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help="Prune backups from Cloud (B2).",
+    )
+    prune_backups_parser.add_argument("--bucket", help="B2 Bucket Name")
+    prune_backups_parser.add_argument("--b2-id", help="B2 Key ID")
+    prune_backups_parser.add_argument("--b2-key", help="B2 App Key")
 
     profile_parser = subparsers.add_parser(
         "profile",
@@ -760,8 +768,7 @@ def get_parser() -> argparse.ArgumentParser:
     )
     sync_parser.add_argument(
         "--bucket-name",
-        required=True,
-        help="Name of the S3 bucket to sync with.",
+        help="Name of the S3 bucket to sync with. Defaults to B2 config if available.",
     )
     sync_parser.add_argument(
         "--endpoint-url",
