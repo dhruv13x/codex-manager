@@ -24,7 +24,10 @@ def test_list_cloud_backups_error():
         raise Exception("err")
     cp.download_file.side_effect = mock_download
 
-    assert list_cloud_backups(cp) == []
+    res = list_cloud_backups(cp)
+    assert len(res) == 1
+    assert res[0].email == "a@b.com"
+    assert res[0].session_start_at == "unknown"
 
 def test_list_cloud_backups_email_ready_sort():
     cp = MagicMock()

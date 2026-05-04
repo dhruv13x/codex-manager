@@ -57,7 +57,7 @@ def test_b2_provider(mock_info, mock_b2):
     # delete_file
     fv_info = MagicMock()
     fv_info.id_ = "id"
-    bucket_mock.get_file_info_by_name.return_value = fv_info
+    bucket_mock.list_file_versions.return_value = [fv_info]
     provider.delete_file("remote")
     bucket_mock.delete_file_version.assert_called_with("id", "remote")
 
