@@ -60,9 +60,13 @@ def test_list_cloud_backups_sort_session(mocker):
     mock_cp = MagicMock()
     mock_file1 = MagicMock()
     mock_file1.name = "1.metadata.json"
+    mock_a1 = MagicMock()
+    mock_a1.name = "1.tar.gz"
     mock_file2 = MagicMock()
     mock_file2.name = "2.metadata.json"
-    mock_cp.list_files.return_value = [mock_file1, mock_file2]
+    mock_a2 = MagicMock()
+    mock_a2.name = "2.tar.gz"
+    mock_cp.list_files.return_value = [mock_file1, mock_a1, mock_file2, mock_a2]
 
     def dl_file(remote, local):
         if "1" in remote:

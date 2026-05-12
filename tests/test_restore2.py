@@ -39,6 +39,34 @@ def test_resolve_archive_path_email(tmp_path):
     args = SimpleNamespace(from_archive=None, email="foo", backup_dir=str(d))
     assert resolve_archive_path(args) == f.resolve()
 
+def test_latest_backup_archive_with_email(tmp_path):
+    d = tmp_path / "backups"
+    d.mkdir()
+    f1 = d / "2026-04-19-100200-foo@example.com-codex.tar.gz"
+    f2 = d / "2026-04-19-110200-foo@example.com-codex.tar.gz"
+    f3 = d / "2026-04-19-120200-bar@example.com-codex.tar.gz"
+    f1.write_text("x")
+    f2.write_text("x")
+    f3.write_text("x")
+    
+    # Should pick latest for foo
+    assert latest_backup_archive(d, email="foo@example.com") == f2.resolve()
+    # Should pick latest for bar
+    assert latest_backup_archive(d, email="bar@example.com") == f3.resolve()
+    # Should fail for missing email
+    with pytest.raises(FileNotFoundError, match="No Codex backup archives found for email baz"):
+        latest_backup_archive(d, email="baz")
+
+def test_resolve_archive_path_email_fallback(tmp_path):
+    d = tmp_path / "backups"
+    d.mkdir()
+    f = d / "2026-04-19-100200-foo@example.com-codex.tar.gz"
+    f.write_text("x")
+    
+    # Symlink is missing, should fall back to finding latest archive
+    args = SimpleNamespace(from_archive=None, email="foo@example.com", backup_dir=str(d))
+    assert resolve_archive_path(args) == f.resolve()
+
 def test_resolve_archive_path_missing(tmp_path):
     args = SimpleNamespace(from_archive=str(tmp_path / "missing"))
     with pytest.raises(FileNotFoundError):

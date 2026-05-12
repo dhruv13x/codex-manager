@@ -29,7 +29,20 @@ def resolve_archive_path(args) -> Path:
     if getattr(args, "from_archive", None):
         archive_path = Path(args.from_archive).expanduser()
     elif getattr(args, "email", None):
-        archive_path = Path(args.backup_dir).expanduser() / f"{args.email}-latest-codex.tar.gz"
+        backup_dir = Path(args.backup_dir).expanduser()
+        archive_path = backup_dir / f"{args.email}-latest-codex.tar.gz"
+        if not archive_path.exists():
+            # Fallback: Find latest matching archive for this email
+            try:
+                archive_path = latest_backup_archive(backup_dir, email=args.email)
+            except FileNotFoundError:
+                if list(backup_dir.glob(f"*-{args.email}-codex.metadata.json")):
+                    raise FileNotFoundError(
+                        f"Cannot use account '{args.email}': Only metadata exists (no backup archive). "
+                        "The account may have been pruned or saved as metadata-only."
+                    )
+                # Re-raise or let it fall through to the .exists() check below
+                pass
     else:
         archive_path = latest_backup_archive(Path(args.backup_dir).expanduser())
 
@@ -38,16 +51,28 @@ def resolve_archive_path(args) -> Path:
     return archive_path.resolve()
 
 
-def latest_backup_archive(backup_dir: Path) -> Path:
+def latest_backup_archive(backup_dir: Path, email: str | None = None) -> Path:
     if not backup_dir.exists():
         raise FileNotFoundError(f"Backup directory does not exist: {backup_dir}")
+    
+    pattern = "*-codex.tar.gz"
+    if email:
+        pattern = f"*-{email}-codex.tar.gz"
+        
     archives = sorted(
-        backup_dir.glob("*-codex.tar.gz"),
+        [
+            p for p in backup_dir.glob(pattern)
+            if "-latest-" not in p.name
+        ],
         key=lambda path: path.name,
         reverse=True,
     )
+    
     if not archives:
-        raise FileNotFoundError(f"No Codex backup archives found in: {backup_dir}")
+        msg = f"No Codex backup archives found in: {backup_dir}"
+        if email:
+            msg = f"No Codex backup archives found for email {email} in: {backup_dir}"
+        raise FileNotFoundError(msg)
     return archives[0]
 
 

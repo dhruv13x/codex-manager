@@ -32,7 +32,9 @@ def test_list_cloud_backups():
     cp = MagicMock()
     file_obj = MagicMock()
     file_obj.name = "2026-04-19-100200-a@b.com-codex.metadata.json"
-    cp.list_files.return_value = [file_obj]
+    archive_obj = MagicMock()
+    archive_obj.name = "2026-04-19-100200-a@b.com-codex.tar.gz"
+    cp.list_files.return_value = [file_obj, archive_obj]
 
     meta_json = json.dumps({"email": "a@b.com", "reset_at": "2026-04-20T10:00:00+00:00", "created_at": "2026-04-19T10:00:00+00:00", "session_start_at": "2026-04-13T10:00:00+00:00", "archive_path": "path"})
     def mock_download(name, path):

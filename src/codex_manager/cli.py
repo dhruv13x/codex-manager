@@ -521,7 +521,13 @@ def main() -> None:
     }
     handler = handlers.get(args.command)
     if handler is not None:
-        handler(args)
+        try:
+            handler(args)
+        except (FileNotFoundError, ValueError) as exc:
+            from .ui import console
+            import sys
+            console.print(f"[red]Error:[/] {exc}")
+            sys.exit(1)
         return
 
     parser.print_help()

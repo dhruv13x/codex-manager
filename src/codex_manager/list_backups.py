@@ -26,30 +26,10 @@ def iter_backup_archives(backup_dir: Path) -> list[Path]:
     if not backup_dir.exists():
         raise FileNotFoundError(f"Backup directory does not exist: {backup_dir}")
     
-    # Get all archives and all metadata files
-    # We want to ensure we don't miss standalone metadata files (cooldown-only)
-    base_names = set()
-    for pattern in ["*-codex.tar.gz", "*-codex.metadata.json"]:
-        for path in backup_dir.glob(pattern):
-            if "-latest-codex.tar.gz" in path.name:
-                continue
-            
-            # Manually strip extensions to avoid pathlib.with_suffix issues with emails (.com)
-            if path.name.endswith(".tar.gz"):
-                base = path.name[:-7] # len(".tar.gz") == 7
-            else:
-                base = path.name[:-14] # len(".metadata.json") == 14
-            base_names.add(base)
-    
-    # Convert back to actual paths, prioritizing archives
-    result = []
-    for base in base_names:
-        archive = backup_dir / (base + ".tar.gz")
-        if archive.exists():
-            result.append(archive)
-        else:
-            # Standalone metadata
-            result.append(backup_dir / (base + ".metadata.json"))
+    result = [
+        p for p in backup_dir.glob("*-codex.tar.gz")
+        if "-latest-codex.tar.gz" not in p.name
+    ]
 
     return sorted(result, key=lambda path: path.name, reverse=True)
 
@@ -111,7 +91,10 @@ def list_cloud_backups(
             metadata_file = files.get("metadata")
             archive_file = files.get("archive")
             
-            archive_name = archive_file.name if archive_file else (base + ".tar.gz")
+            if not archive_file:
+                continue
+                
+            archive_name = archive_file.name
             
             if metadata_file:
                 local_mf = tmp_path / metadata_file.name

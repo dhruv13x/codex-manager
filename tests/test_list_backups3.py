@@ -18,7 +18,9 @@ def test_list_cloud_backups_error():
     cp = MagicMock()
     file_obj = MagicMock()
     file_obj.name = "2026-04-19-100200-a@b.com-codex.metadata.json"
-    cp.list_files.return_value = [file_obj]
+    archive_obj = MagicMock()
+    archive_obj.name = "2026-04-19-100200-a@b.com-codex.tar.gz"
+    cp.list_files.return_value = [file_obj, archive_obj]
 
     def mock_download(name, path):
         raise Exception("err")
@@ -33,14 +35,18 @@ def test_list_cloud_backups_email_ready_sort():
     cp = MagicMock()
     f1 = MagicMock()
     f1.name = "2026-04-19-100200-a@b.com-codex.metadata.json"
+    a1 = MagicMock(); a1.name = "2026-04-19-100200-a@b.com-codex.tar.gz"
     f2 = MagicMock()
     f2.name = "2026-04-19-100200-other@b.com-codex.metadata.json"
+    a2 = MagicMock(); a2.name = "2026-04-19-100200-other@b.com-codex.tar.gz"
     f3 = MagicMock()
     f3.name = "invalid.metadata.json"
+    a3 = MagicMock(); a3.name = "invalid.tar.gz"
     f4 = MagicMock()
     f4.name = "notready.metadata.json"
+    a4 = MagicMock(); a4.name = "notready.tar.gz"
 
-    cp.list_files.return_value = [f1, f2, f3, f4]
+    cp.list_files.return_value = [f1, a1, f2, a2, f3, a3, f4, a4]
 
     def mock_download(name, path):
         if "other" in name:
