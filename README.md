@@ -2,6 +2,7 @@
 
 **The ultimate CLI tool for managing OpenAI Codex account snapshots, tracking quotas, and ensuring seamless workflow continuity.**
 
+[![Build Status](https://img.shields.io/github/actions/workflow/status/dhruv13x/codex-manager/ci.yml?branch=main)](https://github.com/dhruv13x/codex-manager/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![Code Style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
@@ -81,6 +82,9 @@ Codex Manager prioritizes configuration via environment variables and CLI argume
 |---|---|---|---|
 | `CODEX_MANAGER_HOME` | The primary home directory for the manager config and backups. | `~/.codex-manager` | No |
 | `CODEX_HOME` | The target directory where Codex state resides. | `~/.codex` | No |
+| `AWS_ACCESS_KEY_ID` | Access key for S3/B2 cloud syncing. | None | No |
+| `AWS_SECRET_ACCESS_KEY`| Secret key for S3/B2 cloud syncing. | None | No |
+| `AWS_ENDPOINT_URL` | Endpoint URL for S3/B2 cloud syncing. | None | No |
 
 *Note: You can also place a `config.json` inside your `CODEX_MANAGER_HOME` to persist configuration settings.*
 
@@ -96,6 +100,8 @@ Most commands support these primary flags. Use `cm <command> --help` for a compl
 | `--backup-dir <dir>` | Override the directory used for reading/writing backups. |
 | `--without-status-check`| Bypass live capture and calculate cooldowns statically (+7 days). |
 | `--auth-only` | During `use` or `backup`, target only identity/auth files instead of the full state. |
+| `--bucket <bucket>` | Specify the B2/S3 bucket name directly via CLI. |
+| `--force` | Force overwrite an existing archive or state. |
 
 ---
 
