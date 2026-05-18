@@ -588,7 +588,7 @@ def get_parser() -> argparse.ArgumentParser:
     prune_backups_parser.add_argument(
         "--keep",
         type=int,
-        help="Number of most recent backups to keep per email address.",
+        help="Number of backups to keep per email address (e.g. --keep 1 to keep only the latest account backup).",
     )
     prune_backups_parser.add_argument(
         "--keep-latest-per-email",

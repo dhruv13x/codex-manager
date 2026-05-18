@@ -28,9 +28,11 @@ def perform_prune_backups(
         # Note: we need all entries to prune accurately, even without email filter
         entries = list_cloud_backups(cp, email=None)
     else:
-        entries = [build_backup_entry(path) for path in iter_backup_archives(backup_dir)]
+        raw_entries = [build_backup_entry(path) for path in iter_backup_archives(backup_dir)]
+        entries = [e for e in raw_entries if e is not None]
 
-    # Sort chronologically, oldest first, for easier reasoning about "latest"
+    # Sort chronologically, newest first, for easier reasoning about "latest"
+
     # Actually, default from iter_backup_archives is reverse=True (newest first). Let's work with newest first.
     entries.sort(key=lambda e: e.created_at, reverse=True)
 
@@ -49,7 +51,7 @@ def perform_prune_backups(
 
     if keep is not None:
         if keep < 1:
-            console.print("[bold red]Error:[/] --keep must be at least 1. At least one backup per email is kept until manually deleted.", stderr=True)
+            console.print("[bold red]Error:[/] --keep 0 is not executable. One copy per email backup will always stay until manually deleted by the user.", stderr=True)
             return
             
         email_counts = {}
