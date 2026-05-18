@@ -1,5 +1,12 @@
 # Changelog
 
+## [16.0.0] - 2026-05-18
+### Documentation
+- update ROADMAP.md with phased approach and estimates (#17)
+### Other Changes
+- update
+- update
+
 ## [15.0.0] - 2026-05-12
 
 ## [14.0.0] - 2026-05-04
