@@ -48,9 +48,20 @@ def perform_prune_backups(
         entries = kept
 
     if keep is not None:
-        if len(entries) > keep:
-            to_delete.extend(entries[keep:])
-            entries = entries[:keep]
+        if keep < 1:
+            console.print("[bold red]Error:[/] --keep must be at least 1. At least one backup per email is kept until manually deleted.", stderr=True)
+            return
+            
+        email_counts = {}
+        kept = []
+        for e in entries:
+            count = email_counts.get(e.email, 0)
+            if count < keep:
+                email_counts[e.email] = count + 1
+                kept.append(e)
+            else:
+                to_delete.append(e)
+        entries = kept
 
     if not to_delete:
         console.print("No backups matched pruning criteria.")

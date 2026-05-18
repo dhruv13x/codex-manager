@@ -35,17 +35,19 @@ def test_prune_backups_keep_latest(mock_build, mock_iter):
 @patch("codex_manager.prune_backups.iter_backup_archives")
 @patch("codex_manager.prune_backups.build_backup_entry")
 def test_prune_backups_actual_delete(mock_build, mock_iter):
-    e1 = MagicMock(created_at="2026-04-20")
+    e1 = MagicMock(created_at="2026-04-20", email="test@test.com")
     e1.archive_path.name = "f1.tar.gz"
+    e2 = MagicMock(created_at="2026-04-19", email="test@test.com")
+    e2.archive_path.name = "f2.tar.gz"
     meta_mock = MagicMock()
     meta_mock.exists.return_value = True
-    e1.archive_path.with_name.return_value = meta_mock
+    e2.archive_path.with_name.return_value = meta_mock
 
-    mock_iter.return_value = [Path("f1")]
-    mock_build.side_effect = [e1]
+    mock_iter.return_value = [Path("f1"), Path("f2")]
+    mock_build.side_effect = [e1, e2]
 
-    perform_prune_backups(Path("dir"), keep=0, keep_latest_per_email=False, dry_run=False)
-    e1.archive_path.unlink.assert_called_once()
+    perform_prune_backups(Path("dir"), keep=1, keep_latest_per_email=False, dry_run=False)
+    e2.archive_path.unlink.assert_called_once()
     meta_mock.unlink.assert_called_once()
 
 def test_prune_backups_invalid_args():
