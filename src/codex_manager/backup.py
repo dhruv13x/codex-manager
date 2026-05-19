@@ -28,12 +28,12 @@ def read_status_text_from_args(args) -> str:
         return run_status_command(args.status_command)
 
     return capture_tmux_status_text(
-        session_name=args.tmux_session_name,
-        codex_command=args.codex_command,
-        cols=args.tmux_cols,
-        rows=args.tmux_rows,
-        startup_timeout_seconds=args.startup_timeout_seconds,
-        status_timeout_seconds=args.status_timeout_seconds,
+        session_name=getattr(args, "tmux_session_name", None),
+        codex_command=getattr(args, "codex_command", "codex --no-alt-screen"),
+        cols=getattr(args, "tmux_cols", 120),
+        rows=getattr(args, "tmux_rows", 40),
+        startup_timeout_seconds=getattr(args, "startup_timeout_seconds", 20.0),
+        status_timeout_seconds=getattr(args, "status_timeout_seconds", 20.0),
     )
 
 
