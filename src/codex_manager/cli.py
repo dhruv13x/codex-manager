@@ -163,46 +163,16 @@ def _ensure_cloud_archive(args: Any) -> None:
     args.email = None
 
 
-def build_live_status(args: Any) -> CooldownStatus | None:
-    if not getattr(args, "live", False):
-        return None
-
-    status_text = read_status_text_from_args(args)
-    live_status = parse_live_status_text(
-        status_text,
-        reference_year=getattr(args, "reference_year", None),
-    )
-
-    now = datetime.now().astimezone()
-    remaining_seconds = int((live_status.reset_at - now).total_seconds())
-    status = "ready" if remaining_seconds <= 0 else "cooldown"
-
-    return CooldownStatus(
-        email=live_status.email,
-        status=status,
-        session_start_at=live_status.session_start_at,
-        next_available_at=live_status.reset_at,
-        quota_end_detected_at=now,
-        validation_status="live",
-        proposed_archive_name=live_status.proposed_archive_name,
-        remaining_seconds=max(0, remaining_seconds),
-        quota_text=live_status.quota_text,
-        quota_percent_left=live_status.quota_percent_left,
-        is_expired=live_status.is_expired,
-    )
-
-
 def handle_cooldown(args: Any) -> None:
-    live_status = build_live_status(args)
-    statuses = evaluate_records(list_entries_from_args(args), live_status=live_status)[: args.limit]
-    print_statuses_table(statuses, live_email=live_status.email if live_status else None)
+    statuses = evaluate_records(list_entries_from_args(args), live_status=None)[: args.limit]
+    print_statuses_table(statuses)
 
 
 def handle_recommend(args: Any) -> None:
     recommendation = choose_best_account(
         evaluate_records(
             list_entries_from_args(args),
-            live_status=build_live_status(args),
+            live_status=None,
         )
     )
 

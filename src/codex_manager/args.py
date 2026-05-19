@@ -101,55 +101,12 @@ def get_parser() -> argparse.ArgumentParser:
 
     cooldown_parser = subparsers.add_parser(
         "cooldown",
-        help="Show weekly availability from backup metadata, optionally merged with live Codex status.",
+        help="Show weekly availability from backup metadata.",
     )
     cooldown_parser.add_argument(
         "--backup-dir",
         default=str(DEFAULT_BACKUP_DIR),
         help="Directory containing backup archives and metadata.",
-    )
-    cooldown_parser.add_argument(
-        "--live",
-        action="store_true",
-        help="Query current live account via /status and merge with stored backups.",
-    )
-    cooldown_parser.add_argument(
-        "--status-command",
-        help="Shell command that prints parseable Codex status text for --live mode.",
-    )
-    cooldown_parser.add_argument(
-        "--codex-command",
-        default="codex --no-alt-screen",
-        help="Command used to launch Codex for live tmux capture in --live mode.",
-    )
-    cooldown_parser.add_argument(
-        "--tmux-session-name",
-        default=None,
-        help="Temporary tmux session name used for live status capture in --live mode.",
-    )
-    cooldown_parser.add_argument(
-        "--tmux-cols",
-        type=int,
-        default=120,
-        help="tmux capture width for live status capture in --live mode.",
-    )
-    cooldown_parser.add_argument(
-        "--tmux-rows",
-        type=int,
-        default=40,
-        help="tmux capture height for live status capture in --live mode.",
-    )
-    cooldown_parser.add_argument(
-        "--startup-timeout-seconds",
-        type=float,
-        default=20.0,
-        help="Seconds to wait for the Codex prompt in --live mode.",
-    )
-    cooldown_parser.add_argument(
-        "--status-timeout-seconds",
-        type=float,
-        default=20.0,
-        help="Seconds to wait for the status panel in --live mode.",
     )
     cooldown_parser.add_argument(
         "--limit",
@@ -168,60 +125,12 @@ def get_parser() -> argparse.ArgumentParser:
 
     recommend_parser = subparsers.add_parser(
         "recommend",
-        help="Recommend the best account to use next from backup metadata, optionally merged with live Codex status.",
+        help="Recommend the best account to use next from backup metadata.",
     )
     recommend_parser.add_argument(
         "--backup-dir",
         default=str(DEFAULT_BACKUP_DIR),
         help="Directory containing backup archives and metadata.",
-    )
-    recommend_parser.add_argument(
-        "--live",
-        action="store_true",
-        help="Query current live account via /status and merge with stored backups.",
-    )
-    recommend_parser.add_argument(
-        "--status-command",
-        help="Shell command that prints parseable Codex status text for --live mode.",
-    )
-    recommend_parser.add_argument(
-        "--reference-year",
-        type=int,
-        help="Year used when the status text omits the year in reset time.",
-    )
-    recommend_parser.add_argument(
-        "--codex-command",
-        default="codex --no-alt-screen",
-        help="Command used to launch Codex for live tmux capture in --live mode.",
-    )
-    recommend_parser.add_argument(
-        "--tmux-session-name",
-        default=None,
-        help="Temporary tmux session name used for live status capture in --live mode.",
-    )
-    recommend_parser.add_argument(
-        "--tmux-cols",
-        type=int,
-        default=120,
-        help="tmux capture width for live status capture in --live mode.",
-    )
-    recommend_parser.add_argument(
-        "--tmux-rows",
-        type=int,
-        default=40,
-        help="tmux capture height for live status capture in --live mode.",
-    )
-    recommend_parser.add_argument(
-        "--startup-timeout-seconds",
-        type=float,
-        default=20.0,
-        help="Seconds to wait for the Codex prompt in --live mode.",
-    )
-    recommend_parser.add_argument(
-        "--status-timeout-seconds",
-        type=float,
-        default=20.0,
-        help="Seconds to wait for the status panel in --live mode.",
     )
     recommend_parser.add_argument(
         "--cloud",

@@ -180,7 +180,6 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
     table.add_column("Available", justify="right", style="bright_yellow")
     table.add_column("Session Start", justify="right", style="dim")
     table.add_column("Reset At", justify="right", style="dim")
-    table.add_column("Source", style="dim italic")
 
     for status in statuses:
         account_display = f"[bold]*{status.email}[/]" if status.email == live_email else status.email
@@ -206,7 +205,6 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
             format_remaining(status.remaining_seconds),
             status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
             status.next_available_at.strftime("%Y-%m-%d %H:%M:%S"),
-            status.validation_status,
         )
 
     console.print(Panel(table, title="[bold bright_cyan]Account Cooldown Status[/]", border_style="bright_cyan", expand=False))
@@ -219,7 +217,6 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
         "Available",
         "Session Start",
         "Reset At",
-        "Source",
     ]
     rows = []
     for status in statuses:
@@ -239,7 +236,6 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
                 format_remaining(status.remaining_seconds),
                 status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
                 status.next_available_at.strftime("%Y-%m-%d %H:%M:%S"),
-                status.validation_status,
             ]
         )
 
