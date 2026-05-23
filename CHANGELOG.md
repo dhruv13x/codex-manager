@@ -1,5 +1,9 @@
 # Changelog
 
+## [18.0.1] - 2026-05-23
+### Features
+- improve prune logic with wildcards for state and goals
+
 ## [18.0.0] - 2026-05-19
 ### Other Changes
 - update
