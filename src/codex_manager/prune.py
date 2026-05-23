@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 FILE_GLOBS = [
-    "state_5.sqlite*",
+    "state_*.sqlite*",
+    "goals_*.sqlite*",
     "logs_*",
     "models_cache.json",
     "history.jsonl",

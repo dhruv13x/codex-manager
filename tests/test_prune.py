@@ -15,7 +15,9 @@ def make_args(source_dir: Path, *, dry_run: bool):
 
 def test_build_prune_plan_matches_alias_targets(tmp_path: Path) -> None:
     (tmp_path / "state_5.sqlite").write_text("", encoding="utf-8")
+    (tmp_path / "state_6.sqlite").write_text("", encoding="utf-8")
     (tmp_path / "state_5.sqlite-shm").write_text("", encoding="utf-8")
+    (tmp_path / "goals_1.sqlite").write_text("", encoding="utf-8")
     (tmp_path / "logs_2.sqlite").write_text("", encoding="utf-8")
     (tmp_path / "models_cache.json").write_text("", encoding="utf-8")
     (tmp_path / "history.jsonl").write_text("", encoding="utf-8")
@@ -26,7 +28,9 @@ def test_build_prune_plan_matches_alias_targets(tmp_path: Path) -> None:
     plan = build_prune_plan(tmp_path)
 
     assert any(path.name == "state_5.sqlite" for path in plan.files)
+    assert any(path.name == "state_6.sqlite" for path in plan.files)
     assert any(path.name == "state_5.sqlite-shm" for path in plan.files)
+    assert any(path.name == "goals_1.sqlite" for path in plan.files)
     assert any(path.name == "logs_2.sqlite" for path in plan.files)
     assert any(path.name == "models_cache.json" for path in plan.files)
     assert any(path.name == "history.jsonl" for path in plan.files)
