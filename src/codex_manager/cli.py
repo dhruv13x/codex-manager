@@ -232,24 +232,27 @@ def handle_status(args: Any) -> None:
         input_text = _read_status_command_input(args)
     except TokenExpiredError as exc:
         console.print(f"[bold red]Error:[/] {exc}")
-        
+
+        from .registry import get_active_account
+        active_email = get_active_account()
+
         # Identification Fallback: Try to identify account to mark it as expired
-        current_email = None
-        try:
-            # Try parsing the partial capture first
-            status = parse_live_status_text(exc.output)
-            current_email = status.email
-        except Exception:
-            # If that fails, read from auth.json
-            codex_home = Path(getattr(args, "source_dir", None) or "~/.codex").expanduser()
-            auth_path = codex_home / "auth.json"
-            if auth_path.exists():
-                try:
-                    auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
-                    current_email = auth_data.get("email")
-                except Exception:
-                    pass
-        
+        current_email = active_email
+        if not current_email:
+            try:
+                # Try parsing the partial capture first
+                status = parse_live_status_text(exc.output)
+                current_email = status.email
+            except Exception:
+                # If that fails, read from auth.json
+                codex_home = Path(getattr(args, "source_dir", None) or "~/.codex").expanduser()
+                auth_path = codex_home / "auth.json"
+                if auth_path.exists():
+                    try:
+                        auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
+                        current_email = auth_data.get("email")
+                    except Exception:
+                        pass
         if current_email:
             try:
                 patch_metadata(
@@ -270,9 +273,29 @@ def handle_status(args: Any) -> None:
         input_text,
         reference_year=args.reference_year,
     )
+    
+    from .registry import get_active_account
+    active_email = get_active_account()
+    current_email = status.email or active_email
+    
+    if not current_email:
+        # Fallback to auth.json if status panel didn't show email
+        codex_home = Path(getattr(args, "source_dir", None) or "~/.codex").expanduser()
+        auth_path = codex_home / "auth.json"
+        if auth_path.exists():
+            try:
+                auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
+                current_email = auth_data.get("email")
+            except Exception:
+                pass
+    
+    if not current_email:
+         console.print("[bold red]Error:[/] Could not identify account email from status or auth.json.", stderr=True)
+         sys.exit(1)
+
     try:
         patch_metadata(
-            email=status.email,
+            email=current_email,
             reset_at=status.reset_at,
             quota_text=status.quota_text,
             quota_percent_left=status.quota_percent_left,
@@ -283,7 +306,8 @@ def handle_status(args: Any) -> None:
         )
     except Exception as exc:
         console.print(f"[yellow]Warning:[/] Failed to patch metadata: {exc}")
-    console.print(live_status_to_text(status))
+    
+    console.print(live_status_to_text(status, email_override=current_email))
 
 
 def handle_backup(args: Any) -> None:

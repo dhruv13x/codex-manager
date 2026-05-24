@@ -8,6 +8,7 @@ from .cooldown import evaluate_records
 from .prune import perform_prune
 from .recommend import choose_best_account
 from .restore import perform_restore
+from .registry import set_active_account
 
 
 def perform_use(args: Any) -> tuple[Path, Path, dict[str, Any], Path | None, bool]:
@@ -52,6 +53,10 @@ def perform_use(args: Any) -> tuple[Path, Path, dict[str, Any], Path | None, boo
         args.auth_only = True
     
     archive_path, restored_dest_dir, metadata, existing_backup_path = perform_restore(args)
+    
+    email = metadata.get("email")
+    if email:
+        set_active_account(email, dry_run=args.dry_run)
     
     return archive_path, restored_dest_dir, metadata, existing_backup_path, pruned
 

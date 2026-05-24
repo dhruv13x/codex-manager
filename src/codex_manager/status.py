@@ -12,9 +12,14 @@ from .ui import console
 from .utils import build_archive_name, isoformat_local
 
 STATUS_PANEL_ACCOUNT_RE = re.compile(r"Account:\s+(\S+@\S+)")
+STATUS_PANEL_SESSION_RE = re.compile(r"Session:\s+([a-f0-9-]+)")
 STATUS_PANEL_WEEKLY_RE = re.compile(r"Weekly limit:\s+(.*?)(?:\n|$)", re.DOTALL)
+STATUS_PANEL_LIMITS_RE = re.compile(r"Limits:\s+(.*?)(?:\n|$)", re.DOTALL)
 STATUS_REFRESH_RE = re.compile(r"refresh requested", re.IGNORECASE)
-TOKEN_EXPIRED_RE = re.compile(r"(token_expired|authentication token is expired|signing in again)", re.IGNORECASE)
+TOKEN_EXPIRED_RE = re.compile(
+    r"(token_expired|authentication token is expired|signing in again|token is expired|401\s+Unauthorized|login\s+required)",
+    re.IGNORECASE,
+)
 
 SCRIPT_EMAIL_RE = re.compile(r"Email\s*:\s*(\S+@\S+)")
 SCRIPT_QUOTA_RE = re.compile(r"Quota\s*:\s*(.+)")
@@ -52,7 +57,7 @@ class TokenExpiredError(RuntimeError):
 
 @dataclass(frozen=True)
 class LiveStatus:
-    email: str
+    email: str | None
     reset_at: datetime
     session_start_at: datetime
     quota_text: str
@@ -138,6 +143,9 @@ def capture_tmux_status_text(
                 output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
                 if "›" in output:
                     break
+
+                if TOKEN_EXPIRED_RE.search(output):
+                    raise TokenExpiredError("Codex authentication token is expired.", output)
                 
                 if time.time() - start > startup_timeout_seconds:
                     raise RuntimeError("Timed out waiting for Codex prompt.")
@@ -152,18 +160,17 @@ def capture_tmux_status_text(
                 output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
                 
                 # If we have the full panel, return it
-                if "Account:" in output and "Weekly limit:" in output:
+                if ("Account:" in output and "Weekly limit:" in output) or \
+                   ("Session:" in output and "Limits:" in output):
                     return output
 
-                # Check for token expiry, but ensure we have the Account string if possible
-                if TOKEN_EXPIRED_RE.search(output) and "Account:" in output:
+                # Check for token expiry
+                if TOKEN_EXPIRED_RE.search(output):
                     raise TokenExpiredError("Codex authentication token is expired.", output)
 
-                # Handle 'refresh requested' or missing quota data or token expired without Account
+                # Handle 'refresh requested' or missing quota data
                 elapsed = time.time() - start
                 if elapsed > status_timeout_seconds:
-                    if TOKEN_EXPIRED_RE.search(output):
-                        raise TokenExpiredError("Codex authentication token is expired.", output)
                     if "Account:" in output and (STATUS_REFRESH_RE.search(output) or "refresh" in output.lower()):
                         return output # Return what we have so we can at least get the email
                     raise RuntimeError("Timed out waiting for Codex status panel.")
@@ -178,7 +185,7 @@ def capture_tmux_status_text(
         run_command(["tmux", "kill-session", "-t", session_name], check=False)
 
 
-def _extract_email_and_quota(text: str) -> tuple[str, str]:
+def _extract_email_and_quota(text: str) -> tuple[str | None, str]:
     email_match = SCRIPT_EMAIL_RE.search(text)
     quota_match = SCRIPT_QUOTA_RE.search(text)
     if email_match and quota_match:
@@ -186,9 +193,18 @@ def _extract_email_and_quota(text: str) -> tuple[str, str]:
 
     account_match = STATUS_PANEL_ACCOUNT_RE.search(text)
     weekly_match = STATUS_PANEL_WEEKLY_RE.search(text)
-    if account_match:
-        email = account_match.group(1)
-        quota = weekly_match.group(1).strip() if weekly_match else "Status refreshing or token expired."
+    limits_match = STATUS_PANEL_LIMITS_RE.search(text)
+    
+    email = account_match.group(1) if account_match else None
+    
+    if weekly_match:
+        quota = weekly_match.group(1).strip()
+    elif limits_match:
+        quota = limits_match.group(1).strip()
+    else:
+        quota = "Status refreshing or token expired."
+
+    if email or weekly_match or limits_match or STATUS_PANEL_SESSION_RE.search(text):
         return email, quota
 
     raise ValueError("Unable to parse Codex status text for email and quota.")
@@ -249,14 +265,16 @@ def parse_live_status_text(
         session_start_at=session_start_at,
         quota_text=quota_text,
         quota_percent_left=quota_percent_left,
-        proposed_archive_name=build_archive_name(session_start_at, email),
+        proposed_archive_name=build_archive_name(session_start_at, email or "unknown"),
         is_expired=is_expired,
     )
 
 
-def live_status_to_text(status: LiveStatus) -> str:
+
+def live_status_to_text(status: LiveStatus, email_override: str | None = None) -> str:
+    email = email_override or status.email
     lines = [
-        f"email: {status.email}",
+        f"email: {email}",
         f"reset_at: {status.reset_at.strftime('%Y-%m-%d %H:%M:%S %z')}",
         f"session_start_at: {status.session_start_at.strftime('%Y-%m-%d %H:%M:%S %z')}",
         f"quota_text: {status.quota_text}",

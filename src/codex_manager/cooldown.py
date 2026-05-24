@@ -73,12 +73,15 @@ def evaluate_records(
     statuses = [evaluate_entry(entry, now=now) for entry in entries]
     
     # Merge with registry
-    from .registry import load_registry
+    from .registry import load_registry, get_active_account
     registry_data = load_registry()
+    active_email = get_active_account()
     
     current = now.astimezone() if now is not None else datetime.now().astimezone()
     
     for email, reg_entry in registry_data.items():
+        if email.startswith("_"):
+            continue
         if "updated_at" not in reg_entry:
             continue
             
@@ -147,10 +150,33 @@ def evaluate_records(
         statuses = [s for s in statuses if s.email != live_status.email]
         statuses.append(live_status)
 
+    final_statuses = []
+    for s in statuses:
+        if s.email == active_email:
+            final_statuses.append(
+                CooldownStatus(
+                    email=s.email,
+                    status="active",
+                    session_start_at=s.session_start_at,
+                    next_available_at=s.next_available_at,
+                    quota_end_detected_at=s.quota_end_detected_at,
+                    validation_status=s.validation_status,
+                    proposed_archive_name=s.proposed_archive_name,
+                    remaining_seconds=s.remaining_seconds,
+                    quota_text=s.quota_text,
+                    quota_percent_left=s.quota_percent_left,
+                    is_expired=s.is_expired,
+                )
+            )
+        else:
+            final_statuses.append(s)
+
     return sorted(
-        statuses,
+        final_statuses,
         key=lambda item: (
+            item.status != "active",
             item.status != "ready",
+            item.is_expired,
             item.next_available_at,
             item.email,
         ),
@@ -184,7 +210,11 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
     for status in statuses:
         account_display = f"[bold]*{status.email}[/]" if status.email == live_email else status.email
         
-        if status.is_expired:
+        if status.status == "active":
+            status_display = "[bold bright_red]ACTIVE[/]"
+            if status.is_expired:
+                status_display = "[bold red]ACTIVE (EXPIRED)[/]"
+        elif status.is_expired:
             if status.status == "ready":
                 status_display = "[bold red]RE-LOGIN[/]"
             else:

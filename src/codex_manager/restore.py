@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import CODEX_MANAGER_HOME
+from .registry import set_active_account
 
 
 def _safe_backup_label(value: str) -> str:
@@ -185,6 +186,11 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
             for member in tar.getmembers():
                 if member.name in AUTH_ONLY_INCLUDES:
                     tar.extract(member, path=dest_dir, filter="data")
+        
+        email = metadata.get("email")
+        if email:
+            set_active_account(email, dry_run=args.dry_run)
+            
         return archive_path, dest_dir, metadata, existing_backup_path
 
     extracted_dir = extract_archive_to_temp(archive_path)
@@ -202,6 +208,11 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
 
     dest_dir.parent.mkdir(parents=True, exist_ok=True)
     install_restored_tree(extracted_dir, dest_dir)
+    
+    email = metadata.get("email")
+    if email:
+        set_active_account(email, dry_run=args.dry_run)
+        
     return archive_path, dest_dir, metadata, existing_backup_path
 
 

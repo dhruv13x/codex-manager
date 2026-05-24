@@ -22,17 +22,23 @@ def patch_metadata(
     quota_percent_left: int | None = None,
     args: Any = None,
     session_start_at: Any | None = None,
-    is_expired: bool = False,
+    is_expired: bool | None = None,
     dry_run: bool = False,
 ) -> None:
     backup_dir = Path(args.backup_dir).expanduser() if args and hasattr(args, "backup_dir") else Path("~/.codex-manager/backups").expanduser()
     
+    # Track the effective is_expired state to use for registry sync
+    effective_is_expired = is_expired if is_expired is not None else False
+
     # We will compute the final reset_at and session_start_at to save to registry
     final_reset_at = reset_at
     final_session_start_at = session_start_at
-    if is_expired and final_reset_at is None:
+    
+    # If is_expired is not provided, we might need to check the current state 
+    # but we can do a preliminary check for the explicit 'True' case.
+    if is_expired is True and final_reset_at is None:
         final_reset_at = datetime.now().astimezone()
-    if is_expired and final_session_start_at is None and final_reset_at is not None:
+    if is_expired is True and final_session_start_at is None and final_reset_at is not None:
         final_session_start_at = final_reset_at - timedelta(days=7)
 
     if backup_dir.exists():
@@ -80,7 +86,12 @@ def patch_metadata(
                     data["quota_text"] = quota_text
                 if quota_percent_left is not None:
                     data["quota_percent_left"] = quota_percent_left
-                data["is_expired"] = is_expired
+                
+                if is_expired is not None:
+                    data["is_expired"] = is_expired
+                
+                effective_is_expired = data.get("is_expired", False)
+                
                 data["updated_at"] = datetime.now().astimezone().isoformat()
                 if not dry_run:
                     metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -91,6 +102,7 @@ def patch_metadata(
                     console.print(f"Would update local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]")
             except Exception as exc:
                 console.print(f"[yellow]Warning:[/] Failed to patch local metadata: {exc}")
+                effective_is_expired = is_expired if is_expired is not None else False
         else:
             now = datetime.now().astimezone()
             final_reset_at = reset_at or now
@@ -113,7 +125,7 @@ def patch_metadata(
                 ),
                 "quota_text": quota_text or "unknown",
                 "quota_percent_left": quota_percent_left,
-                "is_expired": is_expired,
+                "is_expired": effective_is_expired,
                 "archive_name": archive_name,
                 "created_at": now.isoformat(),
                 "status_source": "pre_switch_sync",
@@ -133,7 +145,7 @@ def patch_metadata(
     update_registry_entry(
         email=email,
         reset_at=final_reset_at,
-        is_expired=is_expired,
+        is_expired=effective_is_expired,
         quota_text=quota_text,
         quota_percent_left=quota_percent_left,
         session_start_at=final_session_start_at,
@@ -197,8 +209,10 @@ def sync_current_account_status(args: Any) -> None:
     ).expanduser()
     auth_path = codex_home / "auth.json"
 
-    current_email = None
-    if auth_path.exists():
+    from .registry import get_active_account
+    current_email = get_active_account()
+
+    if not current_email and auth_path.exists():
         try:
             auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
             current_email = auth_data.get("email")
@@ -229,6 +243,7 @@ def sync_current_account_status(args: Any) -> None:
             quota_percent_left=None,
             args=args,
             session_start_at=session_start_at,
+            is_expired=None,
             dry_run=getattr(args, "dry_run", False),
         )
         args.current_account_email = current_email
@@ -252,17 +267,21 @@ def sync_current_account_status(args: Any) -> None:
             try:
                 from .status import parse_live_status_text
                 status = parse_live_status_text(exc.output)
-                patch_metadata(
-                    email=status.email,
-                    reset_at=None,
-                    quota_text="TOKEN EXPIRED: Re-login required.",
-                    quota_percent_left=None,
-                    args=args,
-                    session_start_at=None,
-                    is_expired=True,
-                    dry_run=getattr(args, "dry_run", False),
-                )
-                args.current_account_email = status.email
+                identified_email = status.email or current_email
+                if identified_email:
+                    patch_metadata(
+                        email=identified_email,
+                        reset_at=None,
+                        quota_text="TOKEN EXPIRED: Re-login required.",
+                        quota_percent_left=None,
+                        args=args,
+                        session_start_at=None,
+                        is_expired=True,
+                        dry_run=getattr(args, "dry_run", False),
+                    )
+                    args.current_account_email = identified_email
+                else:
+                    raise ValueError("Could not identify account from status or auth.json")
             except Exception:
                 if current_email:
                     patch_metadata(
@@ -302,8 +321,12 @@ def sync_current_account_status(args: Any) -> None:
                 text,
                 reference_year=getattr(args, "reference_year", None),
             )
+            identified_email = status.email or current_email
+            if not identified_email:
+                 raise ValueError("Could not identify account email from status or auth.json")
+
             patch_metadata(
-                email=status.email,
+                email=identified_email,
                 reset_at=status.reset_at,
                 quota_text=status.quota_text,
                 quota_percent_left=status.quota_percent_left,
@@ -312,7 +335,7 @@ def sync_current_account_status(args: Any) -> None:
                 is_expired=status.is_expired,
                 dry_run=getattr(args, "dry_run", False),
             )
-            args.current_account_email = status.email
+            args.current_account_email = identified_email
         except Exception as exc:
             account_label = current_email or "current live account"
             console.print(

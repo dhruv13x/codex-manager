@@ -106,6 +106,24 @@ def upload_registry_to_cloud(cp: B2Provider, *, dry_run: bool = False) -> None:
             console.print(f"[yellow]Warning:[/] Failed to upload registry to cloud: {exc}")
 
 
+def set_active_account(email: str, dry_run: bool = False) -> None:
+    registry = load_registry()
+    registry["_active_account"] = {
+        "email": email,
+        "updated_at": datetime.now().astimezone().isoformat(),
+    }
+    if not dry_run:
+        save_registry(registry)
+
+
+def get_active_account() -> str | None:
+    registry = load_registry()
+    active = registry.get("_active_account")
+    if active and isinstance(active, dict):
+        return active.get("email")
+    return None
+
+
 def update_registry_entry(
     email: str,
     *,
