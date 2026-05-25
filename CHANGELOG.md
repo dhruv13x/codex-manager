@@ -1,5 +1,9 @@
 # Changelog
 
+## [19.0.0] - 2026-05-25
+### Features
+- enhance token expiry detection and implement active account tracking
+
 ## [18.0.1] - 2026-05-23
 ### Features
 - improve prune logic with wildcards for state and goals
