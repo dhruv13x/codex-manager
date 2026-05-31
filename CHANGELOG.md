@@ -1,5 +1,7 @@
 # Changelog
 
+## [20.0.0] - 2026-05-31
+
 ## [19.0.0] - 2026-05-25
 ### Features
 - enhance token expiry detection and implement active account tracking
