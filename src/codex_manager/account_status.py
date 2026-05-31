@@ -142,6 +142,10 @@ def patch_metadata(
             except Exception as exc:
                 console.print(f"[yellow]Warning:[/] Failed to create local metadata: {exc}")
 
+    from .utils import extract_jwt_details
+    codex_home = Path(getattr(args, "source_dir", None) or getattr(args, "dest_dir", None) or "~/.codex").expanduser()
+    jwt_details = extract_jwt_details(codex_home / "auth.json")
+
     update_registry_entry(
         email=email,
         reset_at=final_reset_at,
@@ -150,6 +154,11 @@ def patch_metadata(
         quota_percent_left=quota_percent_left,
         session_start_at=final_session_start_at,
         dry_run=dry_run,
+        plan_type=jwt_details.get("plan_type"),
+        id_token_expires_at=jwt_details.get("id_token_expires_at"),
+        access_token_expires_at=jwt_details.get("access_token_expires_at"),
+        auth_expires_at=jwt_details.get("auth_expires_at"),
+        auth_provider=jwt_details.get("auth_provider"),
     )
 
     if args and getattr(args, "cloud", False):
@@ -209,15 +218,16 @@ def sync_current_account_status(args: Any) -> None:
     ).expanduser()
     auth_path = codex_home / "auth.json"
 
+    if not auth_path.exists():
+        console.print("[yellow]Note:[/] No active session (auth.json missing). Skipping pre-switch status sync.")
+        return
+
     from .registry import get_active_account
     current_email = get_active_account()
 
     if not current_email and auth_path.exists():
-        try:
-            auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
-            current_email = auth_data.get("email")
-        except Exception:
-            pass
+        from .utils import extract_email_from_auth_json
+        current_email = extract_email_from_auth_json(auth_path)
 
     if getattr(args, "without_status_check", False):
         if not current_email:

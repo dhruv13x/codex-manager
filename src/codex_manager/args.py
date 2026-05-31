@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 import sys
-from . import __version__
 
+from . import __version__
 from .config import (
     DEFAULT_BACKUP_DIR,
     DEFAULT_CODEX_HOME,
@@ -154,6 +154,8 @@ def get_parser() -> argparse.ArgumentParser:
     )
     recommend_parser.add_argument(
         "--without-status-check",
+        "--no-status",
+        dest="without_status_check",
         action="store_true",
         help="Skip current account status capture before switching when used with --use or --restore.",
     )
@@ -237,6 +239,17 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Update status metadata in Cloud (B2) as well.",
     )
+    status_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would happen without modifying metadata.",
+    )
+    status_parser.add_argument(
+        "--no-save",
+        action="store_true",
+        dest="dry_run",
+        help="Parse and print status without modifying registry or backup metadata.",
+    )
     status_parser.add_argument("--bucket", help="B2 Bucket Name")
     status_parser.add_argument("--b2-id", help="B2 Key ID")
     status_parser.add_argument("--b2-key", help="B2 App Key")
@@ -304,6 +317,8 @@ def get_parser() -> argparse.ArgumentParser:
     )
     backup_parser.add_argument(
         "--without-status-check",
+        "--no-status",
+        dest="without_status_check",
         action="store_true",
         help="Skip live status capture and use current time minus 7 days for cooldown calculation.",
     )
@@ -346,12 +361,9 @@ def get_parser() -> argparse.ArgumentParser:
         help="Full State Recovery: Restore an entire Codex environment (Auth + History + Logs) from a backup.",
     )
     restore_parser.add_argument(
-        "--from-archive",
-        help="Path to a specific Codex backup archive.",
-    )
-    restore_parser.add_argument(
-        "--email",
-        help="Restore from the latest symlink for this email.",
+        "target",
+        nargs="?",
+        help="Account email or backup archive name from list-backups.",
     )
     restore_parser.add_argument(
         "--backup-dir",
@@ -408,6 +420,8 @@ def get_parser() -> argparse.ArgumentParser:
     )
     restore_parser.add_argument(
         "--without-status-check",
+        "--no-status",
+        dest="without_status_check",
         action="store_true",
         help="Skip current account status capture before restore.",
     )
@@ -420,11 +434,6 @@ def get_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="Delete an existing destination instead of moving it aside to a safety backup.",
-    )
-    restore_parser.add_argument(
-        "--auth-only",
-        action="store_true",
-        help="Identity Only: Only restore auth.json and config files, preserving current session history/logs.",
     )
     restore_parser.add_argument(
         "--cloud",
@@ -497,17 +506,19 @@ def get_parser() -> argparse.ArgumentParser:
     prune_backups_parser.add_argument(
         "--keep",
         type=int,
-        help="Number of backups to keep per email address (e.g. --keep 1 to keep only the latest account backup).",
+        default=2,
+        help="Number of backups to keep per email address (e.g. --keep 1 to keep only the latest account backup). (default: 2)",
     )
     prune_backups_parser.add_argument(
-        "--keep-latest-per-email",
+        "--yes",
+        "-y",
         action="store_true",
-        help="Keep only the latest backup per email, pruning all older ones.",
+        help="Confirm deletion of old backups (actually deletes files; without this, prune-backups runs in dry-run mode).",
     )
     prune_backups_parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Show what would be removed without deleting anything.",
+        help="Show what would be removed without deleting anything (redundant since dry-run is now the default).",
     )
     prune_backups_parser.add_argument(
         "--cloud",
@@ -566,18 +577,21 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show what would be removed without deleting anything.",
     )
+    prune_parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Confirm deletion of runtime state (actually deletes files; without this, prune runs in dry-run mode).",
+    )
 
     use_parser = subparsers.add_parser(
         "use",
         help="Quick Switcher: Log into a backed-up account. Defaults to Auth-Only (preserves current history).",
     )
     use_parser.add_argument(
-        "--from-archive",
-        help="Path to a specific Codex backup archive.",
-    )
-    use_parser.add_argument(
-        "--email",
-        help="Use the latest backup symlink for this email.",
+        "target",
+        nargs="?",
+        help="Account email or backup archive name from list-backups.",
     )
     use_parser.add_argument(
         "--backup-dir",
@@ -634,6 +648,8 @@ def get_parser() -> argparse.ArgumentParser:
     )
     use_parser.add_argument(
         "--without-status-check",
+        "--no-status",
+        dest="without_status_check",
         action="store_true",
         help="Skip current account status capture before switching.",
     )
@@ -660,11 +676,6 @@ def get_parser() -> argparse.ArgumentParser:
     use_parser.add_argument("--bucket", help="B2 Bucket Name")
     use_parser.add_argument("--b2-id", help="B2 Key ID")
     use_parser.add_argument("--b2-key", help="B2 App Key")
-    status_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would happen without modifying metadata.",
-    )
 
     sync_parser = subparsers.add_parser(
         "sync",
@@ -728,8 +739,12 @@ def get_parser() -> argparse.ArgumentParser:
         help="Account Cleanup: Delete all local (and optionally cloud) backups and registry entries for a specific email.",
     )
     remove_parser.add_argument(
+        "target_email",
+        nargs="?",
+        help="The email address of the account to remove.",
+    )
+    remove_parser.add_argument(
         "--email",
-        required=True,
         help="The email address of the account to remove.",
     )
     remove_parser.add_argument(

@@ -92,7 +92,7 @@ def test_prune_backups_keep_latest_per_email(tmp_path: Path) -> None:
     backup_dir = tmp_path / "backups"
     assert len(list_backups(backup_dir)) == 3
 
-    perform_prune_backups(backup_dir, keep_latest_per_email=True)
+    perform_prune_backups(backup_dir, keep=1)
 
     entries = list_backups(backup_dir)
     assert len(entries) == 2

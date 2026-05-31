@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 from codex_manager.cli import (
     handle_list_backups,
     handle_prune,
+    handle_purge,
+    handle_remove,
     list_entries_from_args,
     main,
 )
@@ -68,6 +70,31 @@ def test_handle_prune(mocker, capsys):
     captured = capsys.readouterr()
     assert "prune output" in captured.out
 
+def test_handle_prune_default_dry_run(mocker, capsys):
+    class Args:
+        source_dir = "a"
+        dry_run = False
+    args = Args()
+
+    mocker.patch("codex_manager.cli.perform_prune", return_value=MagicMock())
+    mocker.patch("codex_manager.cli.prune_result_to_text", return_value="prune output")
+
+    handle_prune(args)
+    assert args.dry_run is True  # defaults to dry_run without --yes
+
+def test_handle_prune_with_yes(mocker, capsys):
+    class Args:
+        source_dir = "a"
+        dry_run = False
+        yes = True
+    args = Args()
+
+    mocker.patch("codex_manager.cli.perform_prune", return_value=MagicMock())
+    mocker.patch("codex_manager.cli.prune_result_to_text", return_value="prune output")
+
+    handle_prune(args)
+    assert args.dry_run is False  # runs actual delete when yes=True
+
 def test_main_no_handler(mocker):
     # Just to provide branch coverage where handler is not found
     mocker.patch("codex_manager.config.load_config")
@@ -79,3 +106,57 @@ def test_main_no_handler(mocker):
 
     main()
     mock_parser.print_help.assert_called_once()
+
+def test_handle_purge_default_dry_run(mocker):
+    class Args:
+        source_dir = "a"
+        dry_run = False
+    args = Args()
+
+    mocker.patch("codex_manager.cli.perform_purge", return_value=True)
+    mocker.patch("codex_manager.cli.purge_result_to_text", return_value="purge output")
+
+    handle_purge(args)
+    assert args.dry_run is True
+
+def test_handle_purge_with_yes(mocker):
+    class Args:
+        source_dir = "a"
+        dry_run = False
+        yes = True
+    args = Args()
+
+    mocker.patch("codex_manager.cli.perform_purge", return_value=True)
+    mocker.patch("codex_manager.cli.purge_result_to_text", return_value="purge output")
+
+    handle_purge(args)
+    assert args.dry_run is False
+
+def test_handle_remove_default_dry_run(mocker):
+    class Args:
+        source_dir = "a"
+        dry_run = False
+        email = "test@test.com"
+    args = Args()
+
+    mocker.patch("codex_manager.cli._apply_remove_target")
+    mocker.patch("codex_manager.cli.perform_remove", return_value={})
+    mocker.patch("codex_manager.cli.remove_result_to_text", return_value="remove output")
+
+    handle_remove(args)
+    assert args.dry_run is True
+
+def test_handle_remove_with_yes(mocker):
+    class Args:
+        source_dir = "a"
+        dry_run = False
+        email = "test@test.com"
+        yes = True
+    args = Args()
+
+    mocker.patch("codex_manager.cli._apply_remove_target")
+    mocker.patch("codex_manager.cli.perform_remove", return_value={})
+    mocker.patch("codex_manager.cli.remove_result_to_text", return_value="remove output")
+
+    handle_remove(args)
+    assert args.dry_run is False

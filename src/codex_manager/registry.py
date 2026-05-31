@@ -87,8 +87,9 @@ def sync_registry_with_cloud(cp: B2Provider, dry_run: bool = False) -> None:
 
 def upload_registry_to_cloud(cp: B2Provider, *, dry_run: bool = False) -> None:
     """Upload the current local registry to cloud without performing a merge."""
-    from .ui import console
     import tempfile
+
+    from .ui import console
 
     remote_path = "cooldown.json"
     local_data = load_registry()
@@ -133,6 +134,11 @@ def update_registry_entry(
     quota_percent_left: int | None = None,
     session_start_at: datetime | str | None = None,
     dry_run: bool = False,
+    plan_type: str | None = None,
+    id_token_expires_at: str | None = None,
+    access_token_expires_at: str | None = None,
+    auth_expires_at: str | None = None,
+    auth_provider: str | None = None,
 ) -> None:
     registry = load_registry()
     entry = registry.get(email, {})
@@ -149,6 +155,16 @@ def update_registry_entry(
         entry["session_start_at"] = (
             session_start_at.isoformat() if hasattr(session_start_at, "isoformat") else str(session_start_at)
         )
+    if plan_type:
+        entry["plan_type"] = plan_type
+    if id_token_expires_at:
+        entry["id_token_expires_at"] = id_token_expires_at
+    if access_token_expires_at:
+        entry["access_token_expires_at"] = access_token_expires_at
+    if auth_expires_at:
+        entry["auth_expires_at"] = auth_expires_at
+    if auth_provider:
+        entry["auth_provider"] = auth_provider
     
     entry["updated_at"] = datetime.now().astimezone().isoformat()
     registry[email] = entry

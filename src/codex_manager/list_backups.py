@@ -20,6 +20,9 @@ class BackupEntry:
     quota_text: str
     source: str = "local"
     is_expired: bool = False
+    plan_type: str = "unknown"
+    access_token_expires_at: str | None = None
+    auth_expires_at: str | None = None
 
 
 def iter_backup_archives(backup_dir: Path) -> list[Path]:
@@ -55,6 +58,11 @@ def build_backup_entry(archive_path: Path) -> BackupEntry | None:
             quota_percent_left=metadata.get("quota_percent_left"),
             quota_text=metadata.get("quota_text", "unknown"),
             is_expired=metadata.get("is_expired", False),
+            plan_type=metadata.get("plan_type", "unknown"),
+            access_token_expires_at=metadata.get("access_token_expires_at"),
+            auth_expires_at=metadata.get("auth_expires_at")
+            or metadata.get("access_token_expires_at")
+            or metadata.get("id_token_expires_at"),
         )
     except Exception as exc:
         from .ui import console
@@ -111,6 +119,11 @@ def list_cloud_backups(
                         quota_text=metadata.get("quota_text", "unknown"),
                         source="cloud",
                         is_expired=metadata.get("is_expired", False),
+                        plan_type=metadata.get("plan_type", "unknown"),
+                        access_token_expires_at=metadata.get("access_token_expires_at"),
+                        auth_expires_at=metadata.get("auth_expires_at")
+                        or metadata.get("access_token_expires_at")
+                        or metadata.get("id_token_expires_at"),
                     ))
                 except Exception:
                     # Fallback if metadata download/parse fails

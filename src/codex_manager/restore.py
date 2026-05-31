@@ -17,18 +17,42 @@ def _safe_backup_label(value: str) -> str:
 
 
 def identify_auth_email(auth_path: Path) -> str | None:
-    try:
-        data = json.loads(auth_path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    from .utils import extract_email_from_auth_json
+    return extract_email_from_auth_json(auth_path)
 
-    email = data.get("email")
-    return email if isinstance(email, str) and email.strip() else None
+
+def resolve_named_archive(target: str, backup_dir: Path) -> Path:
+    candidate = Path(target).expanduser()
+    if candidate.is_absolute() or candidate.parent != Path("."):
+        return candidate
+
+    archive_path = backup_dir / target
+    if archive_path.exists():
+        return archive_path
+
+    safety_archive = CODEX_MANAGER_HOME / "safety_backups" / target
+    if safety_archive.exists():
+        return safety_archive
+
+    metadata_name = target
+    if metadata_name.endswith(".metadata.json"):
+        archive_path = backup_dir / metadata_name.replace(".metadata.json", ".tar.gz")
+        if archive_path.exists():
+            return archive_path
+
+    if target.endswith("-codex") and not target.endswith(".tar.gz"):
+        archive_path = backup_dir / f"{target}.tar.gz"
+        if archive_path.exists():
+            return archive_path
+
+    return backup_dir / target
 
 
 def resolve_archive_path(args) -> Path:
+    backup_dir = Path(getattr(args, "backup_dir", "~/.codex-manager/backups")).expanduser()
+    target = getattr(args, "from_archive", None)
     if getattr(args, "from_archive", None):
-        archive_path = Path(args.from_archive).expanduser()
+        archive_path = resolve_named_archive(args.from_archive, backup_dir)
     elif getattr(args, "email", None):
         backup_dir = Path(args.backup_dir).expanduser()
         archive_path = backup_dir / f"{args.email}-latest-codex.tar.gz"
@@ -36,18 +60,22 @@ def resolve_archive_path(args) -> Path:
             # Fallback: Find latest matching archive for this email
             try:
                 archive_path = latest_backup_archive(backup_dir, email=args.email)
-            except FileNotFoundError:
+            except FileNotFoundError as exc:
                 if list(backup_dir.glob(f"*-{args.email}-codex.metadata.json")):
                     raise FileNotFoundError(
                         f"Cannot use account '{args.email}': Only metadata exists (no backup archive). "
                         "The account may have been pruned or saved as metadata-only."
-                    )
+                    ) from exc
                 # Re-raise or let it fall through to the .exists() check below
                 pass
     else:
         archive_path = latest_backup_archive(Path(args.backup_dir).expanduser())
 
     if not archive_path.exists():
+        if target and Path(target).expanduser().parent == Path("."):
+            raise FileNotFoundError(
+                f"Backup target not found in {backup_dir}: {target}. Run cm list-backups."
+            )
         raise FileNotFoundError(f"Backup archive does not exist: {archive_path}")
     return archive_path.resolve()
 
@@ -82,6 +110,23 @@ def metadata_path_for_archive(archive_path: Path) -> Path:
 
 
 def load_metadata_for_archive(archive_path: Path) -> dict:
+    if ".bak-" in archive_path.name:
+        email = "unknown"
+        parts = archive_path.name.split(".bak-")
+        if len(parts) == 2:
+            prefix = parts[0]
+            if prefix.startswith(".codex."):
+                email = prefix[7:].strip(".")
+            elif prefix.startswith("auth.json."):
+                email = prefix[10:].strip(".")
+                
+        return {
+            "email": email,
+            "session_start_at": "unknown (safety backup)",
+            "reset_at": "unknown (safety backup)",
+            "quota_text": "Restored from safety backup",
+        }
+
     metadata_path = metadata_path_for_archive(archive_path)
     if metadata_path.exists():
         try:
@@ -124,12 +169,49 @@ def extract_archive_to_temp(archive_path: Path) -> Path:
 def move_existing_target(dest_dir: Path) -> Path | None:
     if not dest_dir.exists():
         return None
+
+    auth_path = dest_dir / "auth.json"
+    if not auth_path.exists():
+        # If no auth credentials exist, it is a useless blank or purged state.
+        # Clean it up directly instead of creating a redundant safety backup.
+        if dest_dir.is_dir():
+            shutil.rmtree(dest_dir)
+        else:
+            dest_dir.unlink()
+        return None
     
+    current_email = identify_auth_email(auth_path)
+    if not current_email:
+        from .registry import get_active_account
+        current_email = get_active_account()
+
+    email_label = f".{_safe_backup_label(current_email)}" if current_email else ""
+
     safety_dir = CODEX_MANAGER_HOME / "safety_backups"
     safety_dir.mkdir(parents=True, exist_ok=True)
     
-    backup_path = safety_dir / f"{dest_dir.name}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    shutil.move(str(dest_dir), str(backup_path))
+    backup_path = safety_dir / f"{dest_dir.name}{email_label}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
+    
+    try:
+        if dest_dir.is_dir():
+            with tarfile.open(backup_path, "w:gz") as tar:
+                for child in sorted(dest_dir.iterdir(), key=lambda item: item.name):
+                    if child.name in {"tmp", ".tmp"}:
+                        continue
+                    tar.add(child, arcname=child.name)
+            shutil.rmtree(dest_dir)
+        else:
+            with tarfile.open(backup_path, "w:gz") as tar:
+                tar.add(dest_dir, arcname=dest_dir.name)
+            dest_dir.unlink()
+    except Exception as exc:
+        # Fallback safeguard: if compression fails, move the directory/file raw
+        backup_path_fallback = safety_dir / f"{dest_dir.name}{email_label}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+        if backup_path.exists():
+            backup_path.unlink()
+        shutil.move(str(dest_dir), str(backup_path_fallback))
+        return backup_path_fallback
+
     return backup_path
 
 

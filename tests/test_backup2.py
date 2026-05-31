@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -74,3 +75,49 @@ def test_perform_backup_force(tmp_path):
 def test_backup_result_to_text():
     res = backup_result_to_text(Path("archive"), Path("meta"), {"email": "a", "session_start_at": "b", "reset_at": "c", "quota_text": "d"}, dry_run=True)
     assert "dry-run" in res
+
+
+@patch("codex_manager.backup.read_status_text_from_args")
+def test_perform_backup_fallback_expired(mock_read, tmp_path):
+    from codex_manager.status import TokenExpiredError
+    mock_read.side_effect = TokenExpiredError("Expired token test", "expired output")
+
+    source_dir = tmp_path / ".codex"
+    source_dir.mkdir()
+    
+    # Write auth.json with mocked tokens
+    auth_data = {
+        "tokens": {
+            # Base64 encoded: {"email": "fallback-test@gmail.com"}
+            "id_token": "header.eyJlbWFpbCI6ICJmYWxsYmFjay10ZXN0QGdtYWlsLmNvbSJ9.signature"
+        }
+    }
+    (source_dir / "auth.json").write_text(json.dumps(auth_data))
+
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir()
+
+    args = SimpleNamespace(
+        source_dir=str(source_dir),
+        backup_dir=str(backup_dir),
+        status_file=None,
+        status_command=None,
+        reference_year=2026,
+        dry_run=False,
+        force=False,
+        prune_first=False,
+        auth_only=False,
+        include_tmp=False,
+        without_status_check=False
+    )
+
+    # perform_backup should NOT crash; it should fall back to offline identification and save!
+    archive_path, metadata_path, metadata = perform_backup(args)
+
+    assert archive_path.exists()
+    assert metadata_path.exists()
+    assert "-expired-" in archive_path.name
+    assert metadata["email"] == "fallback-test@gmail.com"
+    assert metadata["is_expired"] is True
+    assert metadata["status_error"] == "TokenExpiredError"
+

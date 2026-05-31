@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tempfile
 from dataclasses import asdict, replace
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,21 +12,58 @@ from .account_status import patch_metadata, sync_current_account_status
 from .args import get_parser
 from .backup import backup_result_to_text, perform_backup, read_status_text_from_args
 from .cloud import get_cloud_provider
-from .cooldown import CooldownStatus, evaluate_records, print_statuses_table
+from .cooldown import evaluate_records, print_statuses_table
 from .doctor import run_doctor
 from .list_backups import BackupEntry, list_backups, list_cloud_backups, print_entries_table
 from .profile import export_profile, import_profile
 from .prune import perform_prune, prune_result_to_text
-from .purge import perform_purge, purge_result_to_text
-from .remove import perform_remove, remove_result_to_text
 from .prune_backups import perform_prune_backups
+from .purge import perform_purge, purge_result_to_text
 from .recommend import choose_best_account
 from .registry import sync_registry_with_cloud
+from .remove import perform_remove, remove_result_to_text
 from .restore import perform_restore, restore_result_to_text
 from .status import capture_tmux_status_text, live_status_to_text, parse_live_status_text
 from .sync import pull_backup, push_backup
 from .ui import console
 from .use_account import perform_use, use_result_to_text
+
+
+def _looks_like_email(value: str) -> bool:
+    if value.endswith((".tar.gz", ".metadata.json", "-codex")):
+        return False
+    return re.fullmatch(r"[^@\s/\\]+@[^@\s/\\]+\.[^@\s/\\]+", value) is not None
+
+
+def _apply_restore_target(args: Any) -> None:
+    # Initialize attributes if missing to avoid AttributeErrors
+    if not hasattr(args, "email"):
+        args.email = None
+    if not hasattr(args, "from_archive"):
+        args.from_archive = None
+
+    target = getattr(args, "target", None)
+    if not target:
+        return
+    if args.email or args.from_archive:
+        return
+
+    if _looks_like_email(target):
+        args.email = target
+    else:
+        args.from_archive = target
+
+
+def _apply_remove_target(args: Any) -> None:
+    if not getattr(args, "email", None):
+        args.email = getattr(args, "target_email", None)
+    if not getattr(args, "email", None):
+        console.print(
+            "[bold red]Error:[/] remove requires an email. Usage: cm remove <email> --yes",
+            style="red",
+            stderr=True,
+        )
+        sys.exit(2)
 
 
 def list_entries_from_args(args: Any) -> list[BackupEntry]:
@@ -248,11 +285,8 @@ def handle_status(args: Any) -> None:
                 codex_home = Path(getattr(args, "source_dir", None) or "~/.codex").expanduser()
                 auth_path = codex_home / "auth.json"
                 if auth_path.exists():
-                    try:
-                        auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
-                        current_email = auth_data.get("email")
-                    except Exception:
-                        pass
+                    from .utils import extract_email_from_auth_json
+                    current_email = extract_email_from_auth_json(auth_path)
         if current_email:
             try:
                 patch_metadata(
@@ -283,11 +317,8 @@ def handle_status(args: Any) -> None:
         codex_home = Path(getattr(args, "source_dir", None) or "~/.codex").expanduser()
         auth_path = codex_home / "auth.json"
         if auth_path.exists():
-            try:
-                auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
-                current_email = auth_data.get("email")
-            except Exception:
-                pass
+            from .utils import extract_email_from_auth_json
+            current_email = extract_email_from_auth_json(auth_path)
     
     if not current_email:
          console.print("[bold red]Error:[/] Could not identify account email from status or auth.json.", stderr=True)
@@ -315,8 +346,8 @@ def handle_backup(args: Any) -> None:
         archive_path, metadata_path, metadata = perform_backup(args)
     except FileExistsError as exc:
         console.print(f"[bold red]Stop:[/] {exc}")
-        console.print(f"[dim]Note: Backups are named after the account's weekly reset time.[/]")
-        console.print(f"[dim]If you want to update your current snapshot, run with: [bold white]--force[/][/]")
+        console.print("[dim]Note: Backups are named after the account's weekly reset time.[/]")
+        console.print("[dim]If you want to update your current snapshot, run with: [bold white]--force[/][/]")
         sys.exit(1)
 
     if getattr(args, "cloud", False):
@@ -349,6 +380,7 @@ def handle_backup(args: Any) -> None:
 
 
 def handle_restore(args: Any) -> None:
+    _apply_restore_target(args)
     sync_current_account_status(args)
     _ensure_cloud_archive(args)
     archive_path, dest_dir, metadata, existing_backup_path = perform_restore(args)
@@ -375,8 +407,7 @@ def handle_prune_backups(args: Any) -> None:
     perform_prune_backups(
         Path(args.backup_dir).expanduser(),
         keep=args.keep,
-        keep_latest_per_email=args.keep_latest_per_email,
-        dry_run=args.dry_run,
+        dry_run=args.dry_run or not getattr(args, "yes", False),
         cloud=getattr(args, "cloud", False),
         args=args,
     )
@@ -405,22 +436,27 @@ def handle_profile(args: Any) -> None:
 
 def handle_prune(args: Any) -> None:
     source_dir = Path(args.source_dir).expanduser()
+    args.dry_run = args.dry_run or not getattr(args, "yes", False)
     plan = perform_prune(args)
     console.print(prune_result_to_text(plan, dry_run=args.dry_run, source_dir=source_dir))
 
 
 def handle_purge(args: Any) -> None:
     source_dir = Path(args.source_dir).expanduser()
+    args.dry_run = args.dry_run or not getattr(args, "yes", False)
     success = perform_purge(args)
     console.print(purge_result_to_text(success, source_dir=source_dir, dry_run=args.dry_run))
 
 
 def handle_remove(args: Any) -> None:
+    _apply_remove_target(args)
+    args.dry_run = args.dry_run or not getattr(args, "yes", False)
     results = perform_remove(args)
     console.print(remove_result_to_text(results, email=args.email, dry_run=args.dry_run))
 
 
 def handle_use(args: Any) -> None:
+    _apply_restore_target(args)
     sync_current_account_status(args)
     _ensure_cloud_archive(args)
     archive_path, dest_dir, metadata, existing_backup_path, pruned = perform_use(args)
@@ -437,8 +473,9 @@ def handle_use(args: Any) -> None:
 
 
 def handle_sync(args: Any) -> None:
-    from .credentials import resolve_b2_credentials
     import sys
+
+    from .credentials import resolve_b2_credentials
 
     backup_dir = Path(args.backup_dir).expanduser()
     bucket_name = args.bucket_name
@@ -458,7 +495,7 @@ def handle_sync(args: Any) -> None:
     # Auto-discover Backblaze B2 S3 endpoint if missing but credentials are set
     if not endpoint_url and access_key and secret_key and access_key == b2_id:
         try:
-            from b2sdk.v2 import InMemoryAccountInfo, B2Api
+            from b2sdk.v2 import B2Api, InMemoryAccountInfo
             info = InMemoryAccountInfo()
             api = B2Api(info)
             api.authorize_account('production', b2_id, b2_key)
@@ -518,8 +555,10 @@ def main() -> None:
         try:
             handler(args)
         except (FileNotFoundError, ValueError) as exc:
-            from .ui import console
             import sys
+
+            from .ui import console
+
             console.print(f"[red]Error:[/] {exc}")
             sys.exit(1)
         return

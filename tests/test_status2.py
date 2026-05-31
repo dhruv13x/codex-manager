@@ -123,3 +123,50 @@ def test_run_command_fail(mock_run):
     mock_run.return_value = MagicMock(returncode=1)
     with pytest.raises(RuntimeError):
         run_command(["foo"])
+
+
+@patch("codex_manager.status.run_command")
+@patch("codex_manager.status.time.sleep")
+def test_capture_tmux_status_text_blocked_states(mock_sleep, mock_run):
+    from codex_manager.status import (
+        CodexUpdateRequiredError,
+        CodexLoginRequiredError,
+        CodexTrustRequiredError,
+    )
+
+    # 1. Update Required State
+    def mock_update(args, **kwargs):
+        if args[:3] == ["tmux", "new-session", "-d"]:
+            return MagicMock(stdout="%42")
+        if "capture-pane" in args:
+            return MagicMock(stdout="✨ Update available! 0.134.0 -> 0.135.0\n› 1. Update now")
+        return MagicMock()
+
+    mock_run.side_effect = mock_update
+    with pytest.raises(CodexUpdateRequiredError, match="update available"):
+        capture_tmux_status_text(startup_timeout_seconds=1.0, status_timeout_seconds=1.0)
+
+    # 2. Login Required State
+    def mock_login(args, **kwargs):
+        if args[:3] == ["tmux", "new-session", "-d"]:
+            return MagicMock(stdout="%42")
+        if "capture-pane" in args:
+            return MagicMock(stdout="Welcome to Codex, OpenAI's command-line coding agent\n> 1. Sign in with ChatGPT")
+        return MagicMock()
+
+    mock_run.side_effect = mock_login
+    with pytest.raises(CodexLoginRequiredError, match="not logged in"):
+        capture_tmux_status_text(startup_timeout_seconds=1.0, status_timeout_seconds=1.0)
+
+    # 3. Trust Required State
+    def mock_trust(args, **kwargs):
+        if args[:3] == ["tmux", "new-session", "-d"]:
+            return MagicMock(stdout="%42")
+        if "capture-pane" in args:
+            return MagicMock(stdout="Do you trust the contents of this directory?\n› 1. Yes, continue")
+        return MagicMock()
+
+    mock_run.side_effect = mock_trust
+    with pytest.raises(CodexTrustRequiredError, match="trust the current directory"):
+        capture_tmux_status_text(startup_timeout_seconds=1.0, status_timeout_seconds=1.0)
+

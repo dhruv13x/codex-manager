@@ -18,6 +18,8 @@ def test_build_prune_plan_matches_alias_targets(tmp_path: Path) -> None:
     (tmp_path / "state_6.sqlite").write_text("", encoding="utf-8")
     (tmp_path / "state_5.sqlite-shm").write_text("", encoding="utf-8")
     (tmp_path / "goals_1.sqlite").write_text("", encoding="utf-8")
+    (tmp_path / "memories_1.sqlite").write_text("", encoding="utf-8")
+    (tmp_path / "memories_1.sqlite-shm").write_text("", encoding="utf-8")
     (tmp_path / "logs_2.sqlite").write_text("", encoding="utf-8")
     (tmp_path / "models_cache.json").write_text("", encoding="utf-8")
     (tmp_path / "history.jsonl").write_text("", encoding="utf-8")
@@ -31,6 +33,8 @@ def test_build_prune_plan_matches_alias_targets(tmp_path: Path) -> None:
     assert any(path.name == "state_6.sqlite" for path in plan.files)
     assert any(path.name == "state_5.sqlite-shm" for path in plan.files)
     assert any(path.name == "goals_1.sqlite" for path in plan.files)
+    assert any(path.name == "memories_1.sqlite" for path in plan.files)
+    assert any(path.name == "memories_1.sqlite-shm" for path in plan.files)
     assert any(path.name == "logs_2.sqlite" for path in plan.files)
     assert any(path.name == "models_cache.json" for path in plan.files)
     assert any(path.name == "history.jsonl" for path in plan.files)
@@ -53,6 +57,7 @@ def test_prune_dry_run_preserves_files(tmp_path: Path) -> None:
 
 def test_prune_removes_runtime_state_but_preserves_auth(tmp_path: Path) -> None:
     (tmp_path / "state_5.sqlite").write_text("", encoding="utf-8")
+    (tmp_path / "memories_1.sqlite").write_text("", encoding="utf-8")
     (tmp_path / "history.jsonl").write_text("", encoding="utf-8")
     (tmp_path / "cache").mkdir()
     (tmp_path / "sessions").mkdir()
@@ -62,6 +67,7 @@ def test_prune_removes_runtime_state_but_preserves_auth(tmp_path: Path) -> None:
     perform_prune(make_args(tmp_path, dry_run=False))
 
     assert not (tmp_path / "state_5.sqlite").exists()
+    assert not (tmp_path / "memories_1.sqlite").exists()
     assert not (tmp_path / "history.jsonl").exists()
     assert not (tmp_path / "cache").exists()
     assert not (tmp_path / "sessions").exists()

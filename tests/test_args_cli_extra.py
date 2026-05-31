@@ -4,7 +4,7 @@ from codex_manager.cli import main
 
 
 def test_main_use_cloud(mocker, monkeypatch, tmp_path):
-    monkeypatch.setattr("sys.argv", ["cm", "use", "--cloud", "--email", "test@example.com"])
+    monkeypatch.setattr("sys.argv", ["cm", "use", "test@example.com", "--cloud"])
 
     mock_cp = MagicMock()
     mocker.patch("codex_manager.cli.get_cloud_provider", return_value=mock_cp)
@@ -22,7 +22,7 @@ def test_main_use_cloud(mocker, monkeypatch, tmp_path):
     main()
 
 def test_main_restore_cloud(mocker, monkeypatch, tmp_path):
-    monkeypatch.setattr("sys.argv", ["cm", "restore", "--cloud", "--email", "test@example.com"])
+    monkeypatch.setattr("sys.argv", ["cm", "restore", "test@example.com", "--cloud"])
 
     mock_cp = MagicMock()
     mocker.patch("codex_manager.cli.get_cloud_provider", return_value=mock_cp)

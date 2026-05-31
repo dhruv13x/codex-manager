@@ -9,14 +9,13 @@ from .cloud import get_cloud_provider
 
 def perform_prune_backups(
     backup_dir: Path,
-    keep: int | None = None,
-    keep_latest_per_email: bool = False,
+    keep: int | None = 2,
     dry_run: bool = False,
     cloud: bool = False,
     args: Any = None,
 ) -> None:
-    if keep is None and not keep_latest_per_email:
-        console.print("Nothing to do: must specify --keep or --keep-latest-per-email")
+    if keep is None:
+        console.print("Nothing to do: must specify --keep")
         return
 
     cp = None
@@ -37,17 +36,6 @@ def perform_prune_backups(
     entries.sort(key=lambda e: e.created_at, reverse=True)
 
     to_delete = []
-
-    if keep_latest_per_email:
-        seen_emails = set()
-        kept = []
-        for e in entries:
-            if e.email not in seen_emails:
-                seen_emails.add(e.email)
-                kept.append(e)
-            else:
-                to_delete.append(e)
-        entries = kept
 
     if keep is not None:
         if keep < 1:

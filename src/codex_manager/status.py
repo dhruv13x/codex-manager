@@ -89,6 +89,41 @@ def run_status_command(command: str) -> str:
     return result.stdout
 
 
+class CodexBlockedError(ValueError):
+    """Base exception for states where Codex is blocked waiting for user interaction."""
+    pass
+
+
+class CodexUpdateRequiredError(CodexBlockedError):
+    pass
+
+
+class CodexLoginRequiredError(CodexBlockedError):
+    pass
+
+
+class CodexTrustRequiredError(CodexBlockedError):
+    pass
+
+
+def check_blocked_states(output: str) -> None:
+    if "Update available!" in output or "1. Update now" in output:
+        raise CodexUpdateRequiredError(
+            "Codex has an update available and is waiting for user input. "
+            "Please run 'codex' manually in your terminal to choose an update option first."
+        )
+    if "Welcome to Codex" in output or "Sign in with ChatGPT" in output or "Sign in with Device Code" in output:
+        raise CodexLoginRequiredError(
+            "Codex is not logged in. "
+            "Please run 'codex' manually in your terminal to sign in."
+        )
+    if "Do you trust the contents of this directory?" in output or "Working with untrusted contents" in output:
+        raise CodexTrustRequiredError(
+            "Codex is asking if you trust the current directory. "
+            "Please run 'codex' manually in your terminal to trust the directory first."
+        )
+
+
 def capture_tmux_status_text(
     *,
     session_name: str | None = None,
@@ -141,6 +176,7 @@ def capture_tmux_status_text(
         with console.status("[cyan]Waiting for Codex prompt...[/cyan]", spinner="dots"):
             while True:
                 output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
+                check_blocked_states(output)
                 if "›" in output:
                     break
 
@@ -158,6 +194,7 @@ def capture_tmux_status_text(
         with console.status("[cyan]Checking Codex status...[/cyan]", spinner="dots"):
             while True:
                 output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
+                check_blocked_states(output)
                 
                 # If we have the full panel, return it
                 if ("Account:" in output and "Weekly limit:" in output) or \

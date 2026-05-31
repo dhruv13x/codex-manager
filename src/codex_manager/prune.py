@@ -7,6 +7,7 @@ from pathlib import Path
 FILE_GLOBS = [
     "state_*.sqlite*",
     "goals_*.sqlite*",
+    "memories_*.sqlite*",
     "logs_*",
     "models_cache.json",
     "history.jsonl",

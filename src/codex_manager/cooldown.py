@@ -20,6 +20,9 @@ class CooldownStatus:
     quota_text: str | None = None
     quota_percent_left: int | None = None
     is_expired: bool = False
+    plan_type: str = "unknown"
+    access_token_expires_at: str | None = None
+    auth_expires_at: str | None = None
 
 
 def parse_iso_datetime(value: Any) -> datetime:
@@ -62,6 +65,10 @@ def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownS
         quota_text=getattr(entry, "quota_text", None),
         quota_percent_left=getattr(entry, "quota_percent_left", None),
         is_expired=is_expired,
+        plan_type=getattr(entry, "plan_type", "unknown"),
+        access_token_expires_at=getattr(entry, "access_token_expires_at", None),
+        auth_expires_at=getattr(entry, "auth_expires_at", None)
+        or getattr(entry, "access_token_expires_at", None),
     )
 
 
@@ -73,7 +80,7 @@ def evaluate_records(
     statuses = [evaluate_entry(entry, now=now) for entry in entries]
     
     # Merge with registry
-    from .registry import load_registry, get_active_account
+    from .registry import get_active_account, load_registry
     registry_data = load_registry()
     active_email = get_active_account()
     
@@ -116,7 +123,12 @@ def evaluate_records(
                     remaining_seconds=max(0, remaining_seconds),
                     quota_text=reg_entry.get("quota_text"),
                     quota_percent_left=reg_entry.get("quota_percent_left"),
-                    is_expired=reg_is_expired
+                    is_expired=reg_is_expired,
+                    plan_type=reg_entry.get("plan_type", existing_status.plan_type),
+                    access_token_expires_at=reg_entry.get("access_token_expires_at", existing_status.access_token_expires_at),
+                    auth_expires_at=reg_entry.get("auth_expires_at")
+                    or reg_entry.get("access_token_expires_at")
+                    or existing_status.auth_expires_at,
                 )
         else:
             # Create a new status from registry
@@ -141,7 +153,11 @@ def evaluate_records(
                     remaining_seconds=max(0, remaining_seconds),
                     quota_text=reg_entry.get("quota_text"),
                     quota_percent_left=reg_entry.get("quota_percent_left"),
-                    is_expired=reg_is_expired
+                    is_expired=reg_is_expired,
+                    plan_type=reg_entry.get("plan_type", "unknown"),
+                    access_token_expires_at=reg_entry.get("access_token_expires_at"),
+                    auth_expires_at=reg_entry.get("auth_expires_at")
+                    or reg_entry.get("access_token_expires_at"),
                 )
             )
 
@@ -166,6 +182,9 @@ def evaluate_records(
                     quota_text=s.quota_text,
                     quota_percent_left=s.quota_percent_left,
                     is_expired=s.is_expired,
+                    plan_type=s.plan_type,
+                    access_token_expires_at=s.access_token_expires_at,
+                    auth_expires_at=s.auth_expires_at,
                 )
             )
         else:
@@ -196,6 +215,55 @@ def format_remaining(seconds: int) -> str:
     return f"{minutes}m"
 
 
+def format_compact_duration(seconds: int) -> str:
+    seconds = max(0, seconds)
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+    if days:
+        return f"{days}d {hours}h" if hours else f"{days}d"
+    if hours:
+        return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+    return f"{minutes}m"
+
+
+def format_auth_state(expires_at: str | None, now: datetime | None = None) -> str:
+    if not expires_at:
+        return "Unknown"
+
+    try:
+        expires = datetime.fromisoformat(expires_at)
+    except ValueError:
+        return "Unknown"
+
+    current = now.astimezone() if now is not None else datetime.now().astimezone()
+    if expires.tzinfo is None:
+        expires = expires.astimezone()
+
+    remaining_seconds = int((expires - current).total_seconds())
+    if remaining_seconds <= 0:
+        return f"Expired {format_compact_duration(abs(remaining_seconds))}"
+    if remaining_seconds < 24 * 60 * 60:
+        return f"Expiring {format_compact_duration(remaining_seconds)}"
+    return f"Valid {format_compact_duration(remaining_seconds)}"
+
+
+def format_quota_display(
+    quota_percent_left: int | None,
+    plan_type: str | None,
+    *,
+    rich_markup: bool = False,
+) -> str:
+    quota = f"{quota_percent_left}%" if quota_percent_left is not None else "unknown"
+    plan = (plan_type or "").strip().lower()
+    if plan in {"", "unknown", "free"}:
+        return quota
+    suffix = f"({plan})"
+    if rich_markup:
+        suffix = f"[dim]{suffix}[/]"
+    return f"{quota} {suffix}"
+
+
 def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None = None) -> None:
     from .ui import Panel, Table, console
 
@@ -204,8 +272,7 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
     table.add_column("Status", justify="center", no_wrap=True)
     table.add_column("Quota", justify="right", style="bright_yellow")
     table.add_column("Available", justify="right", style="bright_yellow")
-    table.add_column("Session Start", justify="right", style="dim")
-    table.add_column("Reset At", justify="right", style="dim")
+    table.add_column("Auth State", justify="right", no_wrap=True)
 
     for status in statuses:
         account_display = f"[bold]*{status.email}[/]" if status.email == live_email else status.email
@@ -222,19 +289,28 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
         else:
             status_display = f"[bold bright_green]{status.status.upper()}[/]" if status.status == "ready" else f"[bold bright_yellow]{status.status.upper()}[/]"
 
-        quota_display = (
-            f"{status.quota_percent_left}%"
-            if status.quota_percent_left is not None
-            else "unknown"
+        quota_display = format_quota_display(
+            status.quota_percent_left,
+            status.plan_type,
+            rich_markup=True,
         )
+
+        auth_state = format_auth_state(status.auth_expires_at)
+        if auth_state.startswith("Expired"):
+            auth_state = f"[bold red]{auth_state}[/]"
+        elif auth_state.startswith("Expiring"):
+            auth_state = f"[bold yellow]{auth_state}[/]"
+        elif auth_state.startswith("Valid"):
+            auth_state = f"[green]{auth_state}[/]"
+        else:
+            auth_state = f"[dim]{auth_state}[/]"
 
         table.add_row(
             account_display,
             status_display,
             quota_display,
             format_remaining(status.remaining_seconds),
-            status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
-            status.next_available_at.strftime("%Y-%m-%d %H:%M:%S"),
+            auth_state,
         )
 
     console.print(Panel(table, title="[bold bright_cyan]Account Cooldown Status[/]", border_style="bright_cyan", expand=False))
@@ -244,9 +320,9 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
     headers = [
         "Account",
         "Status",
+        "Quota",
         "Available",
-        "Session Start",
-        "Reset At",
+        "Auth State",
     ]
     rows = []
     for status in statuses:
@@ -259,13 +335,17 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
             else:
                 status_text = f"RE-LOGIN/({status_text})"
 
+        quota_display = format_quota_display(status.quota_percent_left, status.plan_type)
+
+        auth_state = format_auth_state(status.auth_expires_at)
+
         rows.append(
             [
                 account_display,
                 status_text,
+                quota_display,
                 format_remaining(status.remaining_seconds),
-                status.session_start_at.strftime("%Y-%m-%d %H:%M:%S"),
-                status.next_available_at.strftime("%Y-%m-%d %H:%M:%S"),
+                auth_state,
             ]
         )
 

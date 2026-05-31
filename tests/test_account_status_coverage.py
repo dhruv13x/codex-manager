@@ -79,6 +79,7 @@ def test_patch_metadata_expired_without_existing_metadata_sets_registry_times(mo
 
 
 def test_sync_current_account_status_without_status_check_no_email(tmp_path, capsys):
+    (tmp_path / "auth.json").write_text("{}", encoding="utf-8")
     class Args:
         dest_dir = str(tmp_path)
         without_status_check = True
@@ -90,9 +91,22 @@ def test_sync_current_account_status_without_status_check_no_email(tmp_path, cap
     assert "Could not identify current account from auth.json" in captured.out
 
 
+def test_sync_current_account_status_missing_auth(tmp_path, capsys):
+    # auth.json is missing, should return early silently/with simple note
+    class Args:
+        dest_dir = str(tmp_path)
+        without_status_check = False
+    args = Args()
+
+    sync_current_account_status(args)
+    captured = capsys.readouterr()
+    assert "No active session (auth.json missing)" in captured.out
+
+
 def test_sync_current_account_status_live_status_without_auth_email(mocker, tmp_path):
     dest_dir = tmp_path / "codex"
     dest_dir.mkdir()
+    (dest_dir / "auth.json").write_text("{}", encoding="utf-8")
 
     class Args:
         pass
