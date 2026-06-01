@@ -1,5 +1,11 @@
 # Changelog
 
+## [21.0.0] - 2026-06-01
+### Other Changes
+- update
+- update
+- update
+
 ## [20.0.0] - 2026-05-31
 
 ## [19.0.0] - 2026-05-25
