@@ -14,10 +14,11 @@ from .utils import build_archive_name, isoformat_local
 STATUS_PANEL_ACCOUNT_RE = re.compile(r"Account:\s+(\S+@\S+)")
 STATUS_PANEL_SESSION_RE = re.compile(r"Session:\s+([a-f0-9-]+)")
 STATUS_PANEL_WEEKLY_RE = re.compile(r"Weekly limit:\s+(.*?)(?:\n|$)", re.DOTALL)
+STATUS_PANEL_MONTHLY_RE = re.compile(r"Monthly limit:\s+(.*?)(?:\n|$)", re.DOTALL)
 STATUS_PANEL_LIMITS_RE = re.compile(r"Limits:\s+(.*?)(?:\n|$)", re.DOTALL)
 STATUS_REFRESH_RE = re.compile(r"refresh requested", re.IGNORECASE)
 TOKEN_EXPIRED_RE = re.compile(
-    r"(token_expired|authentication token is expired|signing in again|token is expired|401\s+Unauthorized|login\s+required)",
+    r"(token_expired|authentication token is expired|signing in again|sign in again|token is expired|401\s+Unauthorized|login\s+required|invalidated oauth token|token_revoked|refresh token was already used)",
     re.IGNORECASE,
 )
 
@@ -117,11 +118,8 @@ def check_blocked_states(output: str) -> None:
             "Codex is not logged in. "
             "Please run 'codex' manually in your terminal to sign in."
         )
-    if "Do you trust the contents of this directory?" in output or "Working with untrusted contents" in output:
-        raise CodexTrustRequiredError(
-            "Codex is asking if you trust the current directory. "
-            "Please run 'codex' manually in your terminal to trust the directory first."
-        )
+    pass
+
 
 
 def capture_tmux_status_text(
@@ -170,12 +168,26 @@ def capture_tmux_status_text(
     if not pane_id:
         raise RuntimeError("tmux did not return a pane id for the temporary capture session.")
     run_command(["tmux", "set-option", "-t", session_name, "remain-on-exit", "on"])
+    # Allow 2 seconds for Codex to fully initialize and prompt to load
+    time.sleep(2.0)
 
     try:
+        trust_attempts = 0
         start = time.time()
         with console.status("[cyan]Waiting for Codex prompt...[/cyan]", spinner="dots"):
             while True:
                 output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
+                if "Do you trust the contents of this directory?" in output or "Working with untrusted contents" in output:
+                    if trust_attempts >= 1:
+                        raise CodexTrustRequiredError(
+                            "Codex is asking if you trust the current directory. "
+                            "Please run 'codex' manually in your terminal to trust the directory first."
+                        )
+                    run_command(["tmux", "send-keys", "-t", pane_id, "1", "Enter"])
+                    trust_attempts += 1
+                    time.sleep(1.0)
+                    continue
+
                 check_blocked_states(output)
                 if "›" in output:
                     break
@@ -194,10 +206,21 @@ def capture_tmux_status_text(
         with console.status("[cyan]Checking Codex status...[/cyan]", spinner="dots"):
             while True:
                 output = run_command(["tmux", "capture-pane", "-t", pane_id, "-p"]).stdout
+                if "Do you trust the contents of this directory?" in output or "Working with untrusted contents" in output:
+                    if trust_attempts >= 1:
+                        raise CodexTrustRequiredError(
+                            "Codex is asking if you trust the current directory. "
+                            "Please run 'codex' manually in your terminal to trust the directory first."
+                        )
+                    run_command(["tmux", "send-keys", "-t", pane_id, "1", "Enter"])
+                    trust_attempts += 1
+                    time.sleep(1.0)
+                    continue
+
                 check_blocked_states(output)
                 
                 # If we have the full panel, return it
-                if ("Account:" in output and "Weekly limit:" in output) or \
+                if ("Account:" in output and ("limit:" in output.lower() or "limits:" in output.lower())) or \
                    ("Session:" in output and "Limits:" in output):
                     return output
 
@@ -230,18 +253,21 @@ def _extract_email_and_quota(text: str) -> tuple[str | None, str]:
 
     account_match = STATUS_PANEL_ACCOUNT_RE.search(text)
     weekly_match = STATUS_PANEL_WEEKLY_RE.search(text)
+    monthly_match = STATUS_PANEL_MONTHLY_RE.search(text)
     limits_match = STATUS_PANEL_LIMITS_RE.search(text)
     
     email = account_match.group(1) if account_match else None
     
     if weekly_match:
         quota = weekly_match.group(1).strip()
+    elif monthly_match:
+        quota = monthly_match.group(1).strip()
     elif limits_match:
         quota = limits_match.group(1).strip()
     else:
         quota = "Status refreshing or token expired."
 
-    if email or weekly_match or limits_match or STATUS_PANEL_SESSION_RE.search(text):
+    if email or weekly_match or monthly_match or limits_match or STATUS_PANEL_SESSION_RE.search(text):
         return email, quota
 
     raise ValueError("Unable to parse Codex status text for email and quota.")

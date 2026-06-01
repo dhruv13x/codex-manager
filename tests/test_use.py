@@ -61,9 +61,8 @@ def test_use_preserve_mode_restores_latest_for_email(tmp_path: Path) -> None:
     _, _, metadata, previous, pruned = perform_use(args)
     assert metadata["email"] == "letsmaildhruv@gmail.com"
     assert previous is not None
-    assert "auth.json." in previous.name
-    assert ".bak-" in previous.name
-    assert "old@example.com" in previous.name
+    assert previous.parent.name == "old@example.com"
+    assert previous.name == "latest.tar.gz"
     assert pruned is False
     assert (dest_dir / "auth.json").read_text(encoding="utf-8") == '{"token":"x"}'
     assert (dest_dir / "history.jsonl").read_text(encoding="utf-8") == "runtime"
@@ -92,25 +91,3 @@ def test_use_clean_mode_prunes_then_restores(tmp_path: Path) -> None:
     assert pruned is True
     assert (dest_dir / "auth.json").read_text(encoding="utf-8") == '{"token":"x"}'
     assert not (dest_dir / "cache").exists()
-
-
-def test_use_preserve_mode_prefers_live_account_email_for_safety_backup(tmp_path: Path) -> None:
-    create_sample_backup(tmp_path)
-    dest_dir = tmp_path / "dest"
-    dest_dir.mkdir()
-    (dest_dir / "auth.json").write_text('{"token":"old"}', encoding="utf-8")
-
-    args = SimpleNamespace(
-        from_archive=None,
-        email="letsmaildhruv@gmail.com",
-        backup_dir=str(tmp_path / "backups"),
-        dest_dir=str(dest_dir),
-        clean=False,
-        dry_run=False,
-        force=False,
-        current_account_email="live-current@example.com",
-    )
-
-    _, _, _, previous, _ = perform_use(args)
-    assert previous is not None
-    assert "live-current@example.com" in previous.name

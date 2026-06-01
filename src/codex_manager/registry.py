@@ -139,6 +139,7 @@ def update_registry_entry(
     access_token_expires_at: str | None = None,
     auth_expires_at: str | None = None,
     auth_provider: str | None = None,
+    has_refresh_token: bool | None = None,
 ) -> None:
     registry = load_registry()
     entry = registry.get(email, {})
@@ -146,7 +147,20 @@ def update_registry_entry(
     if reset_at:
         entry["reset_at"] = reset_at.isoformat() if hasattr(reset_at, "isoformat") else str(reset_at)
     if is_expired is not None:
-        entry["is_expired"] = is_expired
+        current_is_expired = entry.get("is_expired", False)
+        if current_is_expired:
+            is_successful_sync = False
+            q_txt = quota_text or entry.get("quota_text")
+            if q_txt:
+                text_lower = q_txt.lower()
+                if not ("bypassed" in text_lower or "failed" in text_lower or "expired" in text_lower or "login" in text_lower or "unauthorized" in text_lower or "refresh" in text_lower or "available" in text_lower):
+                    is_successful_sync = True
+            if is_expired is True:
+                entry["is_expired"] = True
+            elif is_expired is False:
+                entry["is_expired"] = False if is_successful_sync else True
+        else:
+            entry["is_expired"] = is_expired
     if quota_text:
         entry["quota_text"] = quota_text
     if quota_percent_left is not None:
@@ -165,6 +179,8 @@ def update_registry_entry(
         entry["auth_expires_at"] = auth_expires_at
     if auth_provider:
         entry["auth_provider"] = auth_provider
+    if has_refresh_token is not None:
+        entry["has_refresh_token"] = has_refresh_token
     
     entry["updated_at"] = datetime.now().astimezone().isoformat()
     registry[email] = entry

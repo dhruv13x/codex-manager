@@ -15,24 +15,34 @@ def choose_best_account(statuses: list[CooldownStatus]) -> Recommendation:
     if not statuses:
         raise ValueError("No account statuses available for recommendation.")
 
+    def has_quota(item: CooldownStatus) -> bool:
+        return item.status == "ready" or (item.quota_percent_left is not None and item.quota_percent_left > 0)
+
     selected = min(
         statuses,
         key=lambda item: (
-            item.status != "ready",
+            not has_quota(item),
             item.is_expired,
             item.validation_status != "live",
-            item.next_available_at if item.status != "ready" else item.session_start_at,
+            item.next_available_at if not has_quota(item) else item.session_start_at,
             item.email,
         ),
     )
 
-    if selected.status == "ready":
+    if has_quota(selected):
         if selected.is_expired:
-            reason = "Ready now, but requires re-login (token expired)."
-        elif selected.validation_status == "live":
-            reason = "Ready now from live Codex status."
+            if selected.status == "ready":
+                reason = "Ready now, but requires re-login (token expired)."
+            else:
+                reason = f"Has {selected.quota_percent_left}% quota remaining, but requires re-login (token expired)."
         else:
-            reason = "Ready now from backup metadata."
+            if selected.status == "ready":
+                if selected.validation_status == "live":
+                    reason = "Ready now from live Codex status."
+                else:
+                    reason = "Ready now from backup metadata."
+            else:
+                reason = f"Has {selected.quota_percent_left}% quota remaining and valid tokens."
     else:
         if selected.is_expired:
             reason = (

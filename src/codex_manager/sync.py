@@ -44,30 +44,31 @@ def push_backup(
         console.print(f"[bold red]Failed to list remote bucket {bucket_name}: {e}[/]", stderr=True)
         return
 
-    # Push all tar.gz and metadata.json files
-    backup_files = sorted(list(backup_dir.glob("*.tar.gz")) + list(backup_dir.glob("*.metadata.json")))
+    # Push all tar.gz and metadata.json files recursively
+    backup_files = sorted(list(backup_dir.glob("**/*.tar.gz")) + list(backup_dir.glob("**/*.metadata.json")))
 
     for file_path in backup_files:
         if not file_path.is_file() or file_path.is_symlink():
             continue
 
-        object_name = file_path.name
+        # Use relative path with forward slashes for S3 object key
+        object_name = str(file_path.relative_to(backup_dir)).replace("\\", "/")
         
         # Check if file exists and has the same size
         if object_name in remote_files and remote_files[object_name] == file_path.stat().st_size:
-            console.print(f"Skipping {file_path.name}, already exists in cloud with same size.")
+            console.print(f"Skipping {object_name}, already exists in cloud with same size.")
             continue
 
         if dry_run:
-            console.print(f"Would push {file_path.name} to s3://{bucket_name}/{object_name}")
+            console.print(f"Would push {object_name} to s3://{bucket_name}/{object_name}")
             continue
 
         try:
-            console.print(f"Uploading {file_path.name} to s3://{bucket_name}/{object_name}...")
+            console.print(f"Uploading {object_name} to s3://{bucket_name}/{object_name}...")
             s3.upload_file(str(file_path), bucket_name, object_name)
-            console.print(f"[green]Successfully uploaded {file_path.name}[/]")
+            console.print(f"[green]Successfully uploaded {object_name}[/]")
         except ClientError as e:
-            console.print(f"[bold red]Failed to upload {file_path.name}: {e}[/]", stderr=True)
+            console.print(f"[bold red]Failed to upload {object_name}: {e}[/]", stderr=True)
 
 
 def pull_backup(
@@ -82,11 +83,14 @@ def pull_backup(
 
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use a set for O(1) lookup
-    local_files = {p.name for p in backup_dir.glob("*")}
+    # Use a set of relative paths for local file lookup
+    local_files = {
+        str(p.relative_to(backup_dir)).replace("\\", "/")
+        for p in backup_dir.glob("**/*")
+        if p.is_file()
+    }
 
     try:
-        # Use simple list_objects_v2 for better test compatibility unless we want to rewrite many tests
         response = s3.list_objects_v2(Bucket=bucket_name)
         if "Contents" not in response:
             if not response.get("KeyCount") or response.get("KeyCount") == 0:
@@ -95,6 +99,9 @@ def pull_backup(
 
         for obj in response["Contents"]:
             object_name = obj["Key"]
+            if object_name.endswith("/"):
+                continue
+
             file_path = backup_dir / object_name
 
             if object_name in local_files:
@@ -107,6 +114,7 @@ def pull_backup(
 
             try:
                 console.print(f"Downloading s3://{bucket_name}/{object_name} to {file_path}...")
+                file_path.parent.mkdir(parents=True, exist_ok=True)
                 s3.download_file(bucket_name, object_name, str(file_path))
                 console.print(f"[green]Successfully downloaded {object_name}[/]")
             except ClientError as e:

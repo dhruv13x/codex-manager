@@ -94,6 +94,7 @@ def test_cooldown_uses_effective_auth_expiration() -> None:
         plan_type="free",
         access_token_expires_at="2026-06-20T10:00:00+05:30",
         auth_expires_at="2026-06-20T10:00:00+05:30",
+        has_refresh_token=False,
     )
 
     status = evaluate_entry(entry)
@@ -102,8 +103,8 @@ def test_cooldown_uses_effective_auth_expiration() -> None:
     assert "Plan" not in table
     assert "FREE" not in table
     assert "(free)" not in table
-    assert "Auth State" in table
-    assert "Valid" in table
+    assert "Auth Status" in table
+    assert "None" in table
     assert "Session Start" not in table
     assert "Reset At" not in table
 

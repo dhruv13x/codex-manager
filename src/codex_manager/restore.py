@@ -12,10 +12,6 @@ from .config import CODEX_MANAGER_HOME
 from .registry import set_active_account
 
 
-def _safe_backup_label(value: str) -> str:
-    return re.sub(r"[^A-Za-z0-9@._-]+", "_", value).strip("._-") or "unknown"
-
-
 def identify_auth_email(auth_path: Path) -> str | None:
     from .utils import extract_email_from_auth_json
     return extract_email_from_auth_json(auth_path)
@@ -26,13 +22,30 @@ def resolve_named_archive(target: str, backup_dir: Path) -> Path:
     if candidate.is_absolute() or candidate.parent != Path("."):
         return candidate
 
+    # Try direct backup_dir / target
     archive_path = backup_dir / target
     if archive_path.exists():
         return archive_path
 
-    safety_archive = CODEX_MANAGER_HOME / "safety_backups" / target
-    if safety_archive.exists():
-        return safety_archive
+    # Try auth/<target>/latest.tar.gz
+    if "@" in target:
+        auth_path = backup_dir / "auth" / target / "latest.tar.gz"
+        if auth_path.exists():
+            return auth_path
+
+    # Try subdirectories
+    for sub in ("auth", "sessions"):
+        p = backup_dir / sub / target
+        if p.exists():
+            return p
+        # Check target without suffix or in subfolder
+        p2 = backup_dir / sub / target / "latest.tar.gz"
+        if p2.exists():
+            return p2
+        # Recursive glob search for target file inside subfolders of the subdirectory
+        for cand in (backup_dir / sub).glob(f"**/{target}"):
+            if cand.exists():
+                return cand
 
     metadata_name = target
     if metadata_name.endswith(".metadata.json"):
@@ -55,19 +68,23 @@ def resolve_archive_path(args) -> Path:
         archive_path = resolve_named_archive(args.from_archive, backup_dir)
     elif getattr(args, "email", None):
         backup_dir = Path(args.backup_dir).expanduser()
-        archive_path = backup_dir / f"{args.email}-latest-codex.tar.gz"
+        # Check new auth store location first
+        archive_path = backup_dir / "auth" / args.email / "latest.tar.gz"
         if not archive_path.exists():
-            # Fallback: Find latest matching archive for this email
-            try:
-                archive_path = latest_backup_archive(backup_dir, email=args.email)
-            except FileNotFoundError as exc:
-                if list(backup_dir.glob(f"*-{args.email}-codex.metadata.json")):
-                    raise FileNotFoundError(
-                        f"Cannot use account '{args.email}': Only metadata exists (no backup archive). "
-                        "The account may have been pruned or saved as metadata-only."
-                    ) from exc
-                # Re-raise or let it fall through to the .exists() check below
-                pass
+            archive_path = backup_dir / f"{args.email}-latest-codex.tar.gz"
+            if not archive_path.exists():
+                # Fallback: Find latest matching archive for this email
+                try:
+                    archive_path = latest_backup_archive(backup_dir, email=args.email)
+                except FileNotFoundError as exc:
+                    new_meta = backup_dir / "auth" / args.email / "latest.metadata.json"
+                    legacy_meta = list(backup_dir.glob(f"*-{args.email}-codex.metadata.json"))
+                    if new_meta.exists() or legacy_meta:
+                        raise FileNotFoundError(
+                            f"Cannot use account '{args.email}': Only metadata exists (no backup archive). "
+                            "The account may have been pruned or saved as metadata-only."
+                        ) from exc
+                        pass
     else:
         archive_path = latest_backup_archive(Path(args.backup_dir).expanduser())
 
@@ -84,25 +101,35 @@ def latest_backup_archive(backup_dir: Path, email: str | None = None) -> Path:
     if not backup_dir.exists():
         raise FileNotFoundError(f"Backup directory does not exist: {backup_dir}")
     
-    pattern = "*-codex.tar.gz"
     if email:
-        pattern = f"*-{email}-codex.tar.gz"
+        auth_path = backup_dir / "auth" / email / "latest.tar.gz"
+        if auth_path.exists():
+            return auth_path
         
-    archives = sorted(
-        [
-            p for p in backup_dir.glob(pattern)
-            if "-latest-" not in p.name
-        ],
-        key=lambda path: path.name,
-        reverse=True,
-    )
+        # Fallback to legacy
+        pattern = f"*-{email}-codex.tar.gz"
+        archives = sorted(
+            [p for p in backup_dir.glob(pattern) if "-latest-" not in p.name],
+            key=lambda path: path.name,
+            reverse=True,
+        )
+        if archives:
+            return archives[0]
+            
+        raise FileNotFoundError(f"No Codex backup archives found for email {email} in: {backup_dir}")
     
-    if not archives:
-        msg = f"No Codex backup archives found in: {backup_dir}"
-        if email:
-            msg = f"No Codex backup archives found for email {email} in: {backup_dir}"
-        raise FileNotFoundError(msg)
-    return archives[0]
+    # No email: look in sessions/ and legacy
+    sessions_dir = backup_dir / "sessions"
+    candidates = []
+    if sessions_dir.exists():
+        candidates.extend(sessions_dir.glob("**/*.tar.gz"))
+    candidates.extend([p for p in backup_dir.glob("*-codex.tar.gz") if "-latest-" not in p.name])
+    
+    if not candidates:
+        raise FileNotFoundError(f"No Codex backup archives found in: {backup_dir}")
+        
+    candidates.sort(key=lambda p: p.name, reverse=True)
+    return candidates[0]
 
 
 def metadata_path_for_archive(archive_path: Path) -> Path:
@@ -110,23 +137,6 @@ def metadata_path_for_archive(archive_path: Path) -> Path:
 
 
 def load_metadata_for_archive(archive_path: Path) -> dict:
-    if ".bak-" in archive_path.name:
-        email = "unknown"
-        parts = archive_path.name.split(".bak-")
-        if len(parts) == 2:
-            prefix = parts[0]
-            if prefix.startswith(".codex."):
-                email = prefix[7:].strip(".")
-            elif prefix.startswith("auth.json."):
-                email = prefix[10:].strip(".")
-                
-        return {
-            "email": email,
-            "session_start_at": "unknown (safety backup)",
-            "reset_at": "unknown (safety backup)",
-            "quota_text": "Restored from safety backup",
-        }
-
     metadata_path = metadata_path_for_archive(archive_path)
     if metadata_path.exists():
         try:
@@ -140,10 +150,15 @@ def load_metadata_for_archive(archive_path: Path) -> dict:
             member_name = archive_path.name.replace(".tar.gz", ".metadata.json")
             try:
                 member = tar.getmember(member_name)
-            except KeyError as exc:
-                raise FileNotFoundError(
-                    f"Metadata file not found beside archive or inside archive: {member_name}"
-                ) from exc
+            except KeyError:
+                # Session backups might have different metadata file name, let's try getting the only metadata file
+                metadata_members = [m for m in tar.getmembers() if m.name.endswith(".metadata.json")]
+                if metadata_members:
+                    member = metadata_members[0]
+                else:
+                    raise FileNotFoundError(
+                        f"Metadata file not found beside archive or inside archive: {member_name}"
+                    )
             extracted = tar.extractfile(member)
             if extracted is None:
                 raise FileNotFoundError(f"Failed to extract metadata member: {member_name}")
@@ -153,6 +168,14 @@ def load_metadata_for_archive(archive_path: Path) -> dict:
 
 
 def validate_archive_contents(archive_path: Path) -> None:
+    # Under Separate Stores, session-only backups do not have auth.json
+    try:
+        metadata = load_metadata_for_archive(archive_path)
+        if metadata.get("backup_mode") == "session-only" or "sessions/" in str(archive_path) or archive_path.name.startswith("backup-"):
+            return  # Valid session-only backup (does not require auth.json)
+    except Exception:
+        pass
+
     with tarfile.open(archive_path, "r:gz") as tar:
         names = set(tar.getnames())
     if "auth.json" not in names:
@@ -166,65 +189,32 @@ def extract_archive_to_temp(archive_path: Path) -> Path:
     return temp_dir
 
 
-def move_existing_target(dest_dir: Path) -> Path | None:
-    if not dest_dir.exists():
-        return None
 
-    auth_path = dest_dir / "auth.json"
-    if not auth_path.exists():
-        # If no auth credentials exist, it is a useless blank or purged state.
-        # Clean it up directly instead of creating a redundant safety backup.
-        if dest_dir.is_dir():
-            shutil.rmtree(dest_dir)
-        else:
-            dest_dir.unlink()
-        return None
-    
-    current_email = identify_auth_email(auth_path)
-    if not current_email:
-        from .registry import get_active_account
-        current_email = get_active_account()
-
-    email_label = f".{_safe_backup_label(current_email)}" if current_email else ""
-
-    safety_dir = CODEX_MANAGER_HOME / "safety_backups"
-    safety_dir.mkdir(parents=True, exist_ok=True)
-    
-    backup_path = safety_dir / f"{dest_dir.name}{email_label}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}.tar.gz"
-    
-    try:
-        if dest_dir.is_dir():
-            with tarfile.open(backup_path, "w:gz") as tar:
-                for child in sorted(dest_dir.iterdir(), key=lambda item: item.name):
-                    if child.name in {"tmp", ".tmp"}:
-                        continue
-                    tar.add(child, arcname=child.name)
-            shutil.rmtree(dest_dir)
-        else:
-            with tarfile.open(backup_path, "w:gz") as tar:
-                tar.add(dest_dir, arcname=dest_dir.name)
-            dest_dir.unlink()
-    except Exception as exc:
-        # Fallback safeguard: if compression fails, move the directory/file raw
-        backup_path_fallback = safety_dir / f"{dest_dir.name}{email_label}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        if backup_path.exists():
-            backup_path.unlink()
-        shutil.move(str(dest_dir), str(backup_path_fallback))
-        return backup_path_fallback
-
-    return backup_path
 
 
 def install_restored_tree(extracted_dir: Path, dest_dir: Path) -> None:
-    # Use shutil.move because it handles cross-filesystem moves correctly.
-    # We move the entire tree from the temporary extraction point to the final destination.
-    if dest_dir.exists():
-        if dest_dir.is_dir():
-            shutil.rmtree(dest_dir)
-        else:
-            dest_dir.unlink()
-    
-    shutil.move(str(extracted_dir), str(dest_dir))
+    # We move each item from the temporary extraction point to the final destination.
+    # To prevent bind-mount issues or overlayfs locking errors on the root dest_dir,
+    # we clear and populate the directory contents rather than deleting/replacing
+    # the dest_dir folder itself.
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    for child in dest_dir.iterdir():
+        try:
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        except Exception:
+            pass
+
+    for child in extracted_dir.iterdir():
+        dest_child = dest_dir / child.name
+        shutil.move(str(child), str(dest_child))
+
+    try:
+        shutil.rmtree(extracted_dir)
+    except Exception:
+        pass
 
 
 def prune_metadata_file(extracted_dir: Path) -> None:
@@ -237,65 +227,127 @@ def perform_restore(args) -> tuple[Path, Path, dict, Path | None]:
     metadata = load_metadata_for_archive(archive_path)
     validate_archive_contents(archive_path)
 
+    # To prevent safety backup auto-pruning from deleting our target archive
+    # (which occurs when active_email == target_email), we copy the target archive
+    # to a secure temporary location first before doing any safety backups.
+    restore_source_path = archive_path
+    temp_archive_dir = None
+    if not getattr(args, "dry_run", False):
+        temp_archive_dir = Path(tempfile.mkdtemp(prefix="codex-manager-restore-target-"))
+        restore_source_path = temp_archive_dir / archive_path.name
+        shutil.copy2(archive_path, restore_source_path)
+
     dest_dir = Path(args.dest_dir).expanduser()
     
-    auth_only = getattr(args, "auth_only", False)
-    
-    if auth_only:
+    # Auto-backup active account before restore/switch to secure latest rotated refresh tokens.
+    auth_path = dest_dir / "auth.json"
+    auto_backup_path = None
+    if auth_path.exists() and not getattr(args, "dry_run", False):
+        active_email = identify_auth_email(auth_path)
+        if active_email and active_email != "unknown":
+            from .backup import perform_backup
+            from types import SimpleNamespace
+            
+            backup_args = SimpleNamespace(
+                source_dir=str(dest_dir),
+                backup_dir=getattr(args, "backup_dir", str(CODEX_MANAGER_HOME / "backups")),
+                status_file=None,
+                status_command=None,
+                reference_year=getattr(args, "reference_year", None),
+                codex_command=getattr(args, "codex_command", "codex --no-alt-screen"),
+                tmux_session_name=getattr(args, "tmux_session_name", None),
+                tmux_cols=getattr(args, "tmux_cols", 120),
+                tmux_rows=getattr(args, "tmux_rows", 40),
+                startup_timeout_seconds=getattr(args, "startup_timeout_seconds", 20.0),
+                status_timeout_seconds=getattr(args, "status_timeout_seconds", 20.0),
+                include_tmp=False,
+                dry_run=False,
+                force=True,
+                auth_only=True,  # Strictly auth-only auto backup
+                prune_first=False,
+                without_status_check=getattr(args, "status_confirmed_expired", False),
+                captured_status_text=getattr(args, "captured_status_text", None),
+            )
+            try:
+                auto_backup_path, _, _ = perform_backup(backup_args)
+                from .ui import console
+                console.print(f"[green]Auto-saved current active session for:[/] {active_email}")
+            except Exception:
+                # Fail-silent to ensure user's requested restore command is not blocked
+                pass
+
+    is_session = (
+        metadata.get("backup_mode") == "session-only" 
+        or "sessions/" in str(archive_path) 
+        or archive_path.name.startswith("backup-")
+    )
+    is_auth_only = (
+        getattr(args, "auth_only", False) 
+        or "auth/" in str(archive_path) 
+        or "latest-auth" in archive_path.name 
+        or archive_path.name == "latest.tar.gz"
+    )
+
+    if is_session:
         if args.dry_run:
             return archive_path, dest_dir, metadata, None
         
-        # Ensure destination directory exists for auth-only extraction
         dest_dir.mkdir(parents=True, exist_ok=True)
-
-        # Swapping just auth-related files
-        from .backup import AUTH_ONLY_INCLUDES
-        
-        # Backup auth.json if it exists
-        auth_path = dest_dir / "auth.json"
-        existing_backup_path = None
-        if auth_path.exists():
-            safety_dir = CODEX_MANAGER_HOME / "safety_backups"
-            safety_dir.mkdir(parents=True, exist_ok=True)
-            current_email = getattr(args, "current_account_email", None) or identify_auth_email(auth_path)
-            email_label = _safe_backup_label(current_email) if current_email else "unknown"
-            existing_backup_path = safety_dir / (
-                f"auth.json.{email_label}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            )
-            shutil.copy2(auth_path, existing_backup_path)
-        
-        with tarfile.open(archive_path, "r:gz") as tar:
+        from .backup import is_auth_file
+        with tarfile.open(restore_source_path, "r:gz") as tar:
             for member in tar.getmembers():
-                if member.name in AUTH_ONLY_INCLUDES:
+                if not is_auth_file(member.name) and member.name != "latest.metadata.json" and not member.name.endswith(".metadata.json"):
                     tar.extract(member, path=dest_dir, filter="data")
         
+        if temp_archive_dir:
+            shutil.rmtree(temp_archive_dir)
+
+        return archive_path, dest_dir, metadata, auto_backup_path
+
+    elif is_auth_only:
+        if args.dry_run:
+            return archive_path, dest_dir, metadata, None
+        
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        from .backup import is_auth_file
+        with tarfile.open(restore_source_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                if is_auth_file(member.name):
+                    tar.extract(member, path=dest_dir, filter="data")
+        
+        if temp_archive_dir:
+            shutil.rmtree(temp_archive_dir)
+
         email = metadata.get("email")
-        if email:
+        if email and email != "unknown":
             set_active_account(email, dry_run=args.dry_run)
             
-        return archive_path, dest_dir, metadata, existing_backup_path
+        return archive_path, dest_dir, metadata, auto_backup_path
 
-    extracted_dir = extract_archive_to_temp(archive_path)
-    prune_metadata_file(extracted_dir)
+    else:
+        # Legacy Full Restore
+        extracted_dir = extract_archive_to_temp(restore_source_path)
+        prune_metadata_file(extracted_dir)
 
-    existing_backup_path: Path | None = None
-    if args.dry_run:
-        shutil.rmtree(extracted_dir)
-        return archive_path, dest_dir, metadata, existing_backup_path
+        if temp_archive_dir:
+            shutil.rmtree(temp_archive_dir)
 
-    if dest_dir.exists() and not args.force:
-        existing_backup_path = move_existing_target(dest_dir)
-    elif dest_dir.exists() and args.force:
-        shutil.rmtree(dest_dir)
+        if args.dry_run:
+            shutil.rmtree(extracted_dir)
+            return archive_path, dest_dir, metadata, None
 
-    dest_dir.parent.mkdir(parents=True, exist_ok=True)
-    install_restored_tree(extracted_dir, dest_dir)
-    
-    email = metadata.get("email")
-    if email:
-        set_active_account(email, dry_run=args.dry_run)
+        if dest_dir.exists():
+            if not dest_dir.is_dir():
+                dest_dir.unlink()
+
+        dest_dir.parent.mkdir(parents=True, exist_ok=True)
+        install_restored_tree(extracted_dir, dest_dir)
         
-    return archive_path, dest_dir, metadata, existing_backup_path
+        email = metadata.get("email")
+        if email and email != "unknown":
+            set_active_account(email, dry_run=args.dry_run)
+            
+        return archive_path, dest_dir, metadata, auto_backup_path
 
 
 def restore_result_to_text(

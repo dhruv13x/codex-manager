@@ -141,7 +141,7 @@ def test_sync_current_account_status_token_expired(mocker, tmp_path, capsys):
     args = Args()
     args.dest_dir = str(dest_dir)
     args.without_status_check = False
-    args.command = "test"
+    args.command = "status"
     args.reference_year = 2026
     args.dry_run = False
 
@@ -167,7 +167,7 @@ def test_sync_current_account_status_generic_error(mocker, tmp_path, capsys):
     args = Args()
     args.dest_dir = str(dest_dir)
     args.without_status_check = False
-    args.command = "test"
+    args.command = "status"
     args.reference_year = 2026
 
     mocker.patch("codex_manager.account_status.read_status_text_from_args", side_effect=Exception("some error"))
@@ -201,3 +201,52 @@ def test_sync_current_account_status_success(mocker, tmp_path, capsys):
     sync_current_account_status(args)
 
     mock_patch.assert_called()
+
+
+def test_sync_current_account_status_does_not_block_non_status_commands(mocker, tmp_path):
+    dest_dir = tmp_path / "codex"
+    dest_dir.mkdir()
+    auth_path = dest_dir / "auth.json"
+    auth_path.write_text('{"email": "test@example.com"}', encoding="utf-8")
+
+    class Args:
+        pass
+
+    args = Args()
+    args.dest_dir = str(dest_dir)
+    args.without_status_check = False
+    args.command = "restore"  # Non-status command
+    args.reference_year = 2026
+    args.dry_run = False
+
+    mocker.patch("codex_manager.account_status.read_status_text_from_args", side_effect=TokenExpiredError("expired", "raw_output"))
+    mock_patch = mocker.patch("codex_manager.account_status.patch_metadata")
+
+    # It should not raise SystemExit!
+    sync_current_account_status(args)
+
+    mock_patch.assert_called()
+
+
+def test_sync_current_account_status_blocks_non_status_commands_on_generic_error(mocker, tmp_path):
+    dest_dir = tmp_path / "codex"
+    dest_dir.mkdir()
+    auth_path = dest_dir / "auth.json"
+    auth_path.write_text('{"email": "test@example.com"}', encoding="utf-8")
+
+    class Args:
+        pass
+
+    args = Args()
+    args.dest_dir = str(dest_dir)
+    args.without_status_check = False
+    args.command = "restore"  # Non-status command
+    args.reference_year = 2026
+    args.dry_run = False
+
+    mocker.patch("codex_manager.account_status.read_status_text_from_args", side_effect=Exception("Timeout"))
+
+    with pytest.raises(SystemExit):
+        sync_current_account_status(args)
+
+

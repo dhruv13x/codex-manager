@@ -24,10 +24,21 @@ def perform_remove(args: Any) -> dict[str, Any]:
 
     # 1. Identify local files
     local_files = []
+    local_dirs_to_remove = []
     if backup_dir.exists():
+        # Legacy files in root backup directory
         for p in backup_dir.glob("*"):
-            if email in p.name and (p.name.endswith(".tar.gz") or p.name.endswith(".metadata.json")):
+            if p.is_file() and email in p.name and (p.name.endswith(".tar.gz") or p.name.endswith(".metadata.json")):
                 local_files.append(p)
+        
+        # New decoupled files in auth/email/ and sessions/email/
+        for subdir_name in ("auth", "sessions"):
+            target_dir = backup_dir / subdir_name / email
+            if target_dir.exists() and target_dir.is_dir():
+                for p in target_dir.glob("*"):
+                    if p.is_file():
+                        local_files.append(p)
+                local_dirs_to_remove.append(target_dir)
     
     # 2. Identify cloud files if requested
     cloud_files_to_delete = []
@@ -64,6 +75,13 @@ def perform_remove(args: Any) -> dict[str, Any]:
         if not dry_run:
             p.unlink()
         results["local_files_removed"].append(str(p))
+
+    for target_dir in local_dirs_to_remove:
+        if not dry_run:
+            try:
+                target_dir.rmdir()
+            except Exception:
+                pass
 
     if remove_registry_entry(email, dry_run=dry_run):
         results["local_registry_removed"] = True

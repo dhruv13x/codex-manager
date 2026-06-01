@@ -97,6 +97,7 @@ def extract_jwt_details(auth_path: Path) -> dict[str, Any]:
         "organizations": [],
         "email_verified": None,
         "display_name": None,
+        "has_refresh_token": False,
     }
     if not auth_path.exists():
         return details
@@ -104,6 +105,7 @@ def extract_jwt_details(auth_path: Path) -> dict[str, Any]:
     try:
         auth_data = json.loads(auth_path.read_text(encoding="utf-8"))
         tokens = auth_data.get("tokens", {})
+        details["has_refresh_token"] = bool(tokens.get("refresh_token"))
 
         id_payload = _decode_jwt_payload(tokens.get("id_token"))
         access_payload = _decode_jwt_payload(tokens.get("access_token"))

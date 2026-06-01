@@ -23,16 +23,31 @@ class BackupEntry:
     plan_type: str = "unknown"
     access_token_expires_at: str | None = None
     auth_expires_at: str | None = None
+    has_refresh_token: bool = False
 
 
 def iter_backup_archives(backup_dir: Path) -> list[Path]:
     if not backup_dir.exists():
         raise FileNotFoundError(f"Backup directory does not exist: {backup_dir}")
     
-    result = [
-        p for p in backup_dir.glob("*-codex.tar.gz")
-        if "-latest-codex.tar.gz" not in p.name
-    ]
+    result = []
+    
+    # 1. Legacy backups
+    for p in backup_dir.glob("*-codex.tar.gz"):
+        if "-latest-codex.tar.gz" not in p.name:
+            result.append(p)
+            
+    # 2. Session backups
+    sessions_dir = backup_dir / "sessions"
+    if sessions_dir.exists():
+        for p in sessions_dir.glob("**/*.tar.gz"):
+            result.append(p)
+            
+    # 3. Auth backups
+    auth_dir = backup_dir / "auth"
+    if auth_dir.exists():
+        for p in auth_dir.glob("*/latest.tar.gz"):
+            result.append(p)
 
     return sorted(result, key=lambda path: path.name, reverse=True)
 
@@ -63,6 +78,7 @@ def build_backup_entry(archive_path: Path) -> BackupEntry | None:
             auth_expires_at=metadata.get("auth_expires_at")
             or metadata.get("access_token_expires_at")
             or metadata.get("id_token_expires_at"),
+            has_refresh_token=metadata.get("has_refresh_token", True),
         )
     except Exception as exc:
         from .ui import console
@@ -260,6 +276,15 @@ def print_entries_table(entries: list[BackupEntry]) -> None:
             else "unknown"
         )
         archive_name = entry.archive_path.name if hasattr(entry, "archive_path") else getattr(entry, "proposed_archive_name", getattr(entry, "archive_name", "unknown"))
+        if hasattr(entry, "archive_path") and entry.archive_path:
+            p_str = str(entry.archive_path)
+            for folder in ("auth", "sessions"):
+                if f"/{folder}/" in p_str or p_str.startswith(f"{folder}/") or f"\\{folder}\\" in p_str:
+                    parts = entry.archive_path.parts
+                    if folder in parts:
+                        idx = parts.index(folder)
+                        archive_name = "/".join(parts[idx:])
+                        break
         table.add_row(
             archive_name,
             entry.email,
@@ -287,9 +312,19 @@ def entries_to_table(entries: list[BackupEntry]) -> str:
             if entry.quota_percent_left is not None
             else "unknown"
         )
+        archive_name = entry.archive_path.name if hasattr(entry, "archive_path") else getattr(entry, "proposed_archive_name", getattr(entry, "archive_name", "unknown"))
+        if hasattr(entry, "archive_path") and entry.archive_path:
+            p_str = str(entry.archive_path)
+            for folder in ("auth", "sessions"):
+                if f"/{folder}/" in p_str or p_str.startswith(f"{folder}/") or f"\\{folder}\\" in p_str:
+                    parts = entry.archive_path.parts
+                    if folder in parts:
+                        idx = parts.index(folder)
+                        archive_name = "/".join(parts[idx:])
+                        break
         rows.append(
             [
-                entry.archive_path.name if hasattr(entry, "archive_path") else getattr(entry, "proposed_archive_name", getattr(entry, "archive_name", "unknown")),
+                archive_name,
                 entry.email,
                 entry.session_start_at,
                 entry.reset_at,

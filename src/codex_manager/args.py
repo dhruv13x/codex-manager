@@ -119,6 +119,13 @@ def get_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Query availability from Cloud (B2) metadata.",
     )
+    cooldown_parser.add_argument(
+        "--full",
+        "--all",
+        action="store_true",
+        dest="full",
+        help="Show all accounts, including invalid and expired ones.",
+    )
     cooldown_parser.add_argument("--bucket", help="B2 Bucket Name")
     cooldown_parser.add_argument("--b2-id", help="B2 Key ID")
     cooldown_parser.add_argument("--b2-key", help="B2 App Key")
@@ -343,6 +350,11 @@ def get_parser() -> argparse.ArgumentParser:
         help="Only backup auth.json, config.toml, installation_id, etc. instead of the full state.",
     )
     backup_parser.add_argument(
+        "--no-auth",
+        action="store_true",
+        help="Skip backing up credentials/auth files and only create a session-only backup.",
+    )
+    backup_parser.add_argument(
         "--prune-first",
         action="store_true",
         help="Run prune on runtime state before taking the backup.",
@@ -506,8 +518,8 @@ def get_parser() -> argparse.ArgumentParser:
     prune_backups_parser.add_argument(
         "--keep",
         type=int,
-        default=2,
-        help="Number of backups to keep per email address (e.g. --keep 1 to keep only the latest account backup). (default: 2)",
+        default=1,
+        help="Number of backups to keep per email address (e.g. --keep 1 to keep only the latest account backup). (default: 1)",
     )
     prune_backups_parser.add_argument(
         "--yes",

@@ -4,6 +4,25 @@ import shutil
 from pathlib import Path
 from .ui import console, Confirm
 
+def clear_directory_recursively(path: Path) -> None:
+    """Recursively deletes all files and subdirectories under path.
+    If a subdirectory cannot be deleted (e.g. it is a mount point or locked),
+    it recursively clears its contents instead of failing.
+    """
+    if not path.is_dir():
+        return
+    for child in path.iterdir():
+        if child.is_dir():
+            try:
+                shutil.rmtree(child)
+            except Exception:
+                clear_directory_recursively(child)
+        else:
+            try:
+                child.unlink()
+            except Exception:
+                pass
+
 def perform_purge(args) -> bool:
     source_dir = Path(args.source_dir).expanduser()
     
@@ -24,7 +43,11 @@ def perform_purge(args) -> bool:
 
     try:
         if source_dir.is_dir():
-            shutil.rmtree(source_dir)
+            try:
+                shutil.rmtree(source_dir)
+            except Exception:
+                # Robust fallback: recursively clear all contents of the directory
+                clear_directory_recursively(source_dir)
         else:
             source_dir.unlink()
         return True

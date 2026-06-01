@@ -23,6 +23,7 @@ class CooldownStatus:
     plan_type: str = "unknown"
     access_token_expires_at: str | None = None
     auth_expires_at: str | None = None
+    has_refresh_token: bool = False
 
 
 def parse_iso_datetime(value: Any) -> datetime:
@@ -52,6 +53,16 @@ def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownS
     status = "ready" if remaining_seconds <= 0 else "cooldown"
 
     is_expired = getattr(entry, "is_expired", False)
+    auth_expires_at = getattr(entry, "auth_expires_at", None) or getattr(entry, "access_token_expires_at", None)
+    if auth_expires_at:
+        try:
+            expires = parse_iso_datetime(auth_expires_at)
+            if expires.tzinfo is None:
+                expires = expires.astimezone()
+            if expires <= current:
+                is_expired = True
+        except Exception:
+            pass
 
     return CooldownStatus(
         email=entry.email,
@@ -69,6 +80,7 @@ def evaluate_entry(entry: BackupEntry, now: datetime | None = None) -> CooldownS
         access_token_expires_at=getattr(entry, "access_token_expires_at", None),
         auth_expires_at=getattr(entry, "auth_expires_at", None)
         or getattr(entry, "access_token_expires_at", None),
+        has_refresh_token=getattr(entry, "has_refresh_token", False),
     )
 
 
@@ -95,6 +107,18 @@ def evaluate_records(
         reg_updated_at = parse_iso_datetime(reg_entry["updated_at"])
         reg_reset_at = reg_entry.get("reset_at")
         reg_is_expired = reg_entry.get("is_expired", False)
+        reg_has_refresh_token = reg_entry.get("has_refresh_token", True)
+        
+        reg_auth_expires = reg_entry.get("auth_expires_at") or reg_entry.get("access_token_expires_at")
+        if reg_auth_expires:
+            try:
+                expires = parse_iso_datetime(reg_auth_expires)
+                if expires.tzinfo is None:
+                    expires = expires.astimezone()
+                if expires <= current:
+                    reg_is_expired = True
+            except Exception:
+                pass
         
         # Check if we already have a status for this email from backups
         existing_idx = next((i for i, s in enumerate(statuses) if s.email == email), None)
@@ -129,7 +153,29 @@ def evaluate_records(
                     auth_expires_at=reg_entry.get("auth_expires_at")
                     or reg_entry.get("access_token_expires_at")
                     or existing_status.auth_expires_at,
+                    has_refresh_token=reg_has_refresh_token or existing_status.has_refresh_token,
                 )
+            else:
+                # Even if the registry is older, a confirmed expired state in the registry
+                # must always override and override the backup's unexpired offline status.
+                if reg_is_expired and not existing_status.is_expired:
+                    statuses[existing_idx] = CooldownStatus(
+                        email=existing_status.email,
+                        status="ready" if existing_status.remaining_seconds <= 0 else "cooldown",
+                        session_start_at=existing_status.session_start_at,
+                        next_available_at=existing_status.next_available_at,
+                        quota_end_detected_at=existing_status.quota_end_detected_at,
+                        validation_status=existing_status.validation_status,
+                        proposed_archive_name=existing_status.proposed_archive_name,
+                        remaining_seconds=existing_status.remaining_seconds,
+                        quota_text=existing_status.quota_text,
+                        quota_percent_left=existing_status.quota_percent_left,
+                        is_expired=True,
+                        plan_type=existing_status.plan_type,
+                        access_token_expires_at=existing_status.access_token_expires_at,
+                        auth_expires_at=existing_status.auth_expires_at,
+                        has_refresh_token=existing_status.has_refresh_token,
+                    )
         else:
             # Create a new status from registry
             if reg_reset_at is not None:
@@ -158,6 +204,7 @@ def evaluate_records(
                     access_token_expires_at=reg_entry.get("access_token_expires_at"),
                     auth_expires_at=reg_entry.get("auth_expires_at")
                     or reg_entry.get("access_token_expires_at"),
+                    has_refresh_token=reg_has_refresh_token,
                 )
             )
 
@@ -185,6 +232,7 @@ def evaluate_records(
                     plan_type=s.plan_type,
                     access_token_expires_at=s.access_token_expires_at,
                     auth_expires_at=s.auth_expires_at,
+                    has_refresh_token=s.has_refresh_token,
                 )
             )
         else:
@@ -227,6 +275,9 @@ def format_compact_duration(seconds: int) -> str:
     return f"{minutes}m"
 
 
+
+
+
 def format_auth_state(expires_at: str | None, now: datetime | None = None) -> str:
     if not expires_at:
         return "Unknown"
@@ -264,6 +315,94 @@ def format_quota_display(
     return f"{quota} {suffix}"
 
 
+def format_dual_auth_state(
+    expires_at: str | None,
+    last_verified_at: datetime,
+    is_expired: bool,
+    has_refresh_token: bool,
+    now: datetime | None = None,
+    *,
+    rich_markup: bool = False,
+) -> str:
+    current = now.astimezone() if now is not None else datetime.now().astimezone()
+
+    # 1. Access Token State
+    access_status = "unknown"  # "unknown", "expired", "expiring", "valid"
+    access_duration = ""
+    access_expired = False
+    
+    if expires_at:
+        try:
+            expires = datetime.fromisoformat(expires_at)
+            if expires.tzinfo is None:
+                expires = expires.astimezone()
+            rem = int((expires - current).total_seconds())
+            if rem <= 0:
+                access_status = "expired"
+                access_duration = format_compact_duration(abs(rem))
+                access_expired = True
+            elif rem < 24 * 60 * 60:
+                access_status = "expiring"
+                access_duration = format_compact_duration(rem)
+            else:
+                access_status = "valid"
+                access_duration = format_compact_duration(rem)
+        except ValueError:
+            pass
+
+    # Complete expiration if explicitly marked expired
+    if is_expired:
+        if rich_markup:
+            return "[bold red]Expired[/]"
+        return "Expired"
+
+    # Style access token for Rich text
+    if rich_markup:
+        if access_status == "expired" or access_expired:
+            access_fmt = "[bold red]Expired[/]"
+        elif access_status == "expiring":
+            access_fmt = f"[bold yellow]{access_duration}[/]"
+        elif access_status == "valid":
+            try:
+                expires = datetime.fromisoformat(expires_at)
+                if expires.tzinfo is None:
+                    expires = expires.astimezone()
+                rem = (expires - current).total_seconds()
+                rem_days = rem / 86400.0
+                elapsed = max(0.0, min(10.0, 10.0 - rem_days))
+                
+                if elapsed <= 5.0:
+                    access_fmt = f"[green]{access_duration}[/]"
+                elif elapsed <= 7.0:
+                    access_fmt = f"[bold yellow]{access_duration}[/]"
+                elif elapsed <= 8.0:
+                    access_fmt = f"[bold orange3]{access_duration}[/]"
+                else:
+                    access_fmt = f"[bold red]{access_duration}[/]"
+            except Exception:
+                access_fmt = f"[green]{access_duration}[/]"
+        else:
+            access_fmt = "[dim]Unknown[/]"
+
+        if has_refresh_token:
+            return access_fmt
+        else:
+            return f"{access_fmt} / [dim]None[/]"
+    else:
+        # Plain text
+        if access_status == "expired" or access_expired:
+            access_str = "Expired"
+        elif access_status in ("expiring", "valid"):
+            access_str = access_duration
+        else:
+            access_str = "Unknown"
+
+        if has_refresh_token:
+            return access_str
+        else:
+            return f"{access_str} / None"
+
+
 def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None = None) -> None:
     from .ui import Panel, Table, console
 
@@ -272,7 +411,7 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
     table.add_column("Status", justify="center", no_wrap=True)
     table.add_column("Quota", justify="right", style="bright_yellow")
     table.add_column("Available", justify="right", style="bright_yellow")
-    table.add_column("Auth State", justify="right", no_wrap=True)
+    table.add_column("Auth Status", justify="right", no_wrap=True)
 
     for status in statuses:
         account_display = f"[bold]*{status.email}[/]" if status.email == live_email else status.email
@@ -295,15 +434,13 @@ def print_statuses_table(statuses: list[CooldownStatus], live_email: str | None 
             rich_markup=True,
         )
 
-        auth_state = format_auth_state(status.auth_expires_at)
-        if auth_state.startswith("Expired"):
-            auth_state = f"[bold red]{auth_state}[/]"
-        elif auth_state.startswith("Expiring"):
-            auth_state = f"[bold yellow]{auth_state}[/]"
-        elif auth_state.startswith("Valid"):
-            auth_state = f"[green]{auth_state}[/]"
-        else:
-            auth_state = f"[dim]{auth_state}[/]"
+        auth_state = format_dual_auth_state(
+            status.auth_expires_at,
+            status.quota_end_detected_at,
+            status.is_expired,
+            status.has_refresh_token,
+            rich_markup=True,
+        )
 
         table.add_row(
             account_display,
@@ -322,7 +459,7 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
         "Status",
         "Quota",
         "Available",
-        "Auth State",
+        "Auth Status",
     ]
     rows = []
     for status in statuses:
@@ -337,7 +474,13 @@ def statuses_to_table(statuses: list[CooldownStatus], live_email: str | None = N
 
         quota_display = format_quota_display(status.quota_percent_left, status.plan_type)
 
-        auth_state = format_auth_state(status.auth_expires_at)
+        auth_state = format_dual_auth_state(
+            status.auth_expires_at,
+            status.quota_end_detected_at,
+            status.is_expired,
+            status.has_refresh_token,
+            rich_markup=False,
+        )
 
         rows.append(
             [

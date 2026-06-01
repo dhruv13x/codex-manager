@@ -17,3 +17,11 @@ def test_parse_live_status_text_no_percent():
     ls = parse_live_status_text(text, now=now)
     assert ls.email == "a@b.com"
     assert ls.quota_percent_left is None
+
+
+def test_parse_live_status_text_monthly():
+    text = "Account: a@b.com\nMonthly limit: [███████████████████░] 95% left (resets 13:35 on 1 Jul)"
+    now = datetime(2026, 6, 1, 13, 0, tzinfo=timezone.utc)
+    ls = parse_live_status_text(text, now=now)
+    assert ls.email == "a@b.com"
+    assert ls.quota_percent_left == 95

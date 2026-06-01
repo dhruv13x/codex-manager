@@ -105,3 +105,23 @@ def test_evaluate_records_includes_expired_registry_entries_without_reset_at(moc
 def test_format_remaining() -> None:
     assert format_remaining(0) == "now"
     assert format_remaining(5400) == "1h 30m"
+
+
+def test_evaluate_entry_expired_by_time() -> None:
+    from datetime import timedelta, timezone
+    entry = BackupEntry(
+        archive_path=Path("backup.tar.gz"),
+        email="time-expired@example.com",
+        session_start_at="2026-05-31T09:12:00+05:30",
+        reset_at="2026-06-07T09:12:00+05:30",
+        created_at="2026-05-31T10:03:29+05:30",
+        quota_percent_left=96,
+        quota_text="96% left",
+        plan_type="free",
+        access_token_expires_at="2026-05-31T12:00:00+05:30",
+        auth_expires_at="2026-05-31T12:00:00+05:30",
+        has_refresh_token=False,
+    )
+    status = evaluate_entry(entry, now=datetime(2026, 6, 1, 12, 0, tzinfo=timezone(timedelta(hours=5, minutes=30))))
+    assert status.is_expired is True
+

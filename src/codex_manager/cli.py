@@ -201,7 +201,10 @@ def _ensure_cloud_archive(args: Any) -> None:
 
 
 def handle_cooldown(args: Any) -> None:
-    statuses = evaluate_records(list_entries_from_args(args), live_status=None)[: args.limit]
+    statuses = evaluate_records(list_entries_from_args(args), live_status=None)
+    if not getattr(args, "full", False) and not getattr(args, "all", False):
+        statuses = [s for s in statuses if not (s.is_expired and s.status != "active")]
+    statuses = statuses[: args.limit]
     print_statuses_table(statuses)
 
 

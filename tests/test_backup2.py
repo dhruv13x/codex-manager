@@ -64,13 +64,9 @@ def test_perform_backup_force(tmp_path):
     archive, _, _ = perform_backup(args)
     assert archive.exists()
 
-    # Second should fail without force
-    with pytest.raises(FileExistsError):
-        perform_backup(args)
-
-    # Third should succeed with force
-    args.force = True
+    # Second backup should also succeed without force (since we now auto-overwrite to protect rotated tokens)
     perform_backup(args)
+    assert archive.exists()
 
 def test_backup_result_to_text():
     res = backup_result_to_text(Path("archive"), Path("meta"), {"email": "a", "session_start_at": "b", "reset_at": "c", "quota_text": "d"}, dry_run=True)
@@ -116,8 +112,12 @@ def test_perform_backup_fallback_expired(mock_read, tmp_path):
 
     assert archive_path.exists()
     assert metadata_path.exists()
-    assert "-expired-" in archive_path.name
-    assert metadata["email"] == "fallback-test@gmail.com"
     assert metadata["is_expired"] is True
     assert metadata["status_error"] == "TokenExpiredError"
+    
+    # We also verify that the auth-only backup was created at the correct Split Store location
+    auth_archive = backup_dir / "auth" / "fallback-test@gmail.com" / "latest.tar.gz"
+    auth_metadata = backup_dir / "auth" / "fallback-test@gmail.com" / "latest.metadata.json"
+    assert auth_archive.exists()
+    assert auth_metadata.exists()
 

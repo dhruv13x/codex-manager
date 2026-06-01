@@ -86,6 +86,7 @@ def test_sync_current_account_status_with_bypass_creates_reset_based_metadata_na
 
 def test_sync_current_account_status_failure_instructions(mock_args, capsys):
     mock_args.without_status_check = False
+    mock_args.command = "status"
     
     # Mock status capture failure
     with patch("codex_manager.account_status.read_status_text_from_args", side_effect=Exception("Timeout")):

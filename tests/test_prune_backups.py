@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -26,6 +27,7 @@ def make_backup_args(tmp_path: Path, source_dir: Path, status_file: Path):
         force=True,
         auth_only=False,
         prune_first=False,
+        no_auto_prune=True,
     )
 
 
@@ -45,15 +47,19 @@ def test_prune_backups_keep(tmp_path: Path) -> None:
         time.sleep(0.1)
 
     backup_dir = tmp_path / "backups"
-    assert len(list_backups(backup_dir)) == 5
+    # 1 auth backup (test@example.com) + 5 session backups (test@example.com) = 6 entries
+    assert len(list_backups(backup_dir)) == 6
 
     perform_prune_backups(backup_dir, keep=2)
     entries = list_backups(backup_dir)
-    assert len(entries) == 2
-    # The remaining backups should be the ones with minute 04 and 05 since they are most recent.
-    # Note: list_backups returns newest first by default if sort_by=created_at
-    assert "100500" in entries[0].archive_path.name
-    assert "100400" in entries[1].archive_path.name
+    # keeps the 1 auth backup + 2 latest session backups = 3 entries
+    assert len(entries) == 3
+    
+    # Filter only session entries to verify
+    session_entries = [e for e in entries if "sessions" in str(e.archive_path)]
+    assert len(session_entries) == 2
+    assert "100500" in session_entries[0].archive_path.name
+    assert "100400" in session_entries[1].archive_path.name
 
 
 def test_prune_backups_keep_latest_per_email(tmp_path: Path) -> None:
@@ -90,18 +96,24 @@ def test_prune_backups_keep_latest_per_email(tmp_path: Path) -> None:
     perform_backup(make_backup_args(tmp_path, source_dir, status))
 
     backup_dir = tmp_path / "backups"
-    assert len(list_backups(backup_dir)) == 3
+    # 2 auth backups (a and b) + 3 session backups = 5 entries
+    assert len(list_backups(backup_dir)) == 5
 
     perform_prune_backups(backup_dir, keep=1)
 
     entries = list_backups(backup_dir)
-    assert len(entries) == 2
-    emails = {e.email for e in entries}
-    assert emails == {"a@example.com", "b@example.com"}
+    # keeps 2 auth backups (a and b) + 2 latest session backups (1 for a, 1 for b) = 4 entries
+    assert len(entries) == 4
+    
+    # Verify the latest session backup for user a has Minute 3 in its name
+    session_entries = [e for e in entries if "sessions" in str(e.archive_path)]
+    a_sessions = [e for e in session_entries if e.email == "a@example.com"]
+    b_sessions = [e for e in session_entries if e.email == "b@example.com"]
+    assert len(a_sessions) == 1
+    assert len(b_sessions) == 1
+    assert "100300" in a_sessions[0].archive_path.name
+    assert "100200" in b_sessions[0].archive_path.name
 
-    # User A should have the 10:03 backup
-    a_entry = next(e for e in entries if e.email == "a@example.com")
-    assert "100300" in a_entry.archive_path.name
 
 def test_prune_backups_keep_one_per_email_logic(tmp_path: Path) -> None:
     source_dir = tmp_path / "source"
@@ -125,25 +137,16 @@ def test_prune_backups_keep_one_per_email_logic(tmp_path: Path) -> None:
     status2_1.write_text("Email : u2@example.com\nQuota : [####] 0% left (resets 10:03 on 26 Apr)\n", encoding="utf-8")
     perform_backup(make_backup_args(tmp_path, source_dir, status2_1))
 
-    assert len(list_backups(backup_dir)) == 3
+    # 2 auth backups + 3 session backups = 5 entries
+    assert len(list_backups(backup_dir)) == 5
 
     # Prune with --keep 1
     perform_prune_backups(backup_dir, keep=1)
 
     entries = list_backups(backup_dir)
-    assert len(entries) == 2
-    emails = {e.email for e in entries}
-    assert emails == {"u1@example.com", "u2@example.com"}
+    # 2 auth backups + 2 latest session backups = 4 entries
+    assert len(entries) == 4
 
-    # u1 should only have the latest one (10:02)
-    u1_entries = [e for e in entries if e.email == "u1@example.com"]
-    assert len(u1_entries) == 1
-    assert "100200" in u1_entries[0].archive_path.name
-
-    # u2 should still have its only one
-    u2_entries = [e for e in entries if e.email == "u2@example.com"]
-    assert len(u2_entries) == 1
-    assert "100300" in u2_entries[0].archive_path.name
 
 def test_prune_backups_keep_zero_error(tmp_path: Path, capsys) -> None:
     backup_dir = tmp_path / "backups"

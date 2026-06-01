@@ -9,7 +9,7 @@ from .cloud import get_cloud_provider
 
 def perform_prune_backups(
     backup_dir: Path,
-    keep: int | None = 2,
+    keep: int | None = 1,
     dry_run: bool = False,
     cloud: bool = False,
     args: Any = None,
@@ -45,6 +45,15 @@ def perform_prune_backups(
         email_counts = {}
         kept = []
         for e in entries:
+            is_auth = (
+                "auth/" in str(e.archive_path) 
+                or getattr(e, "backup_mode", None) == "auth-only"
+                or e.archive_path.name == "latest.tar.gz"
+            )
+            if is_auth:
+                kept.append(e)
+                continue
+
             count = email_counts.get(e.email, 0)
             if count < keep:
                 email_counts[e.email] = count + 1

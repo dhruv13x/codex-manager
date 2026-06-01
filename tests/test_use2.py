@@ -42,7 +42,7 @@ def test_perform_use_clean_dry_run(mock_prune, mock_restore, tmp_path):
     mock_prune.assert_called_once()
 
 def test_use_result_to_text():
-    res = use_result_to_text(Path("arc"), Path("dest"), {"email": "test"}, Path("prev"), dry_run=True, pruned=True)
+    res = use_result_to_text(Path("arc"), Path("dest"), {"email": "test"}, None, dry_run=True, pruned=True)
     assert "dry-run" in res
     assert "yes" in res
-    assert "safety_backup" in res
+    assert "safety_backup" not in res

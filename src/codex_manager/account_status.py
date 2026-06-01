@@ -28,7 +28,46 @@ def patch_metadata(
     backup_dir = Path(args.backup_dir).expanduser() if args and hasattr(args, "backup_dir") else Path("~/.codex-manager/backups").expanduser()
     
     # Track the effective is_expired state to use for registry sync
-    effective_is_expired = is_expired if is_expired is not None else False
+    from .registry import get_registry_entry
+    existing = get_registry_entry(email)
+    existing_is_expired = False
+    if existing and existing.get("is_expired"):
+        existing_is_expired = True
+
+    # Find if the existing local metadata also indicates expired
+    if backup_dir.exists():
+        metadata_paths = []
+        for p in backup_dir.glob("*.metadata.json"):
+            if email in p.name:
+                 metadata_paths.append(p)
+        auth_meta = backup_dir / "auth" / email / "latest.metadata.json"
+        if auth_meta.exists():
+            metadata_paths.append(auth_meta)
+
+        if metadata_paths:
+            for p in metadata_paths:
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                    if data.get("is_expired"):
+                        existing_is_expired = True
+                        break
+                except Exception:
+                    pass
+
+    if existing_is_expired:
+        is_successful_sync = False
+        if quota_text:
+            text_lower = quota_text.lower()
+            if not ("bypassed" in text_lower or "failed" in text_lower or "expired" in text_lower or "login" in text_lower or "unauthorized" in text_lower or "refresh" in text_lower or "available" in text_lower):
+                is_successful_sync = True
+        if is_expired is True:
+            effective_is_expired = True
+        elif is_expired is False:
+            effective_is_expired = False if is_successful_sync else True
+        else: # is_expired is None
+            effective_is_expired = True
+    else:
+        effective_is_expired = is_expired if is_expired is not None else False
 
     # We will compute the final reset_at and session_start_at to save to registry
     final_reset_at = reset_at
@@ -47,62 +86,59 @@ def patch_metadata(
         for p in backup_dir.glob("*.metadata.json"):
             if email in p.name:
                  metadata_paths.append(p)
+        auth_meta = backup_dir / "auth" / email / "latest.metadata.json"
+        if auth_meta.exists():
+            metadata_paths.append(auth_meta)
         
         if metadata_paths:
-            # Sort by name descending to get the latest
-            metadata_paths.sort(key=lambda p: p.name, reverse=True)
-            metadata_path = metadata_paths[0]
-            try:
-                data = json.loads(metadata_path.read_text(encoding="utf-8"))
-                
-                if reset_at is not None:
-                    data["reset_at"] = (
-                        reset_at.isoformat() if hasattr(reset_at, "isoformat") else str(reset_at)
-                    )
-                    data["next_available_at"] = data["reset_at"]
-                
-                if session_start_at is not None:
-                    data["session_start_at"] = (
-                        session_start_at.isoformat()
-                        if hasattr(session_start_at, "isoformat")
-                        else str(session_start_at)
-                    )
-                
-                # capture the final values from existing metadata if we didn't overwrite
-                if final_reset_at is None and "reset_at" in data:
-                    from .cooldown import parse_iso_datetime
-                    try:
-                        final_reset_at = parse_iso_datetime(data["reset_at"])
-                    except Exception:
-                        pass
-                if final_session_start_at is None and "session_start_at" in data:
-                    from .cooldown import parse_iso_datetime
-                    try:
-                        final_session_start_at = parse_iso_datetime(data["session_start_at"])
-                    except Exception:
-                        pass
+            for metadata_path in metadata_paths:
+                try:
+                    data = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    
+                    if reset_at is not None:
+                        data["reset_at"] = (
+                            reset_at.isoformat() if hasattr(reset_at, "isoformat") else str(reset_at)
+                        )
+                        data["next_available_at"] = data["reset_at"]
+                    
+                    if session_start_at is not None:
+                        data["session_start_at"] = (
+                            session_start_at.isoformat()
+                            if hasattr(session_start_at, "isoformat")
+                            else str(session_start_at)
+                        )
+                    
+                    # capture the final values from existing metadata if we didn't overwrite
+                    if final_reset_at is None and "reset_at" in data:
+                        from .cooldown import parse_iso_datetime
+                        try:
+                            final_reset_at = parse_iso_datetime(data["reset_at"])
+                        except Exception:
+                            pass
+                    if final_session_start_at is None and "session_start_at" in data:
+                        from .cooldown import parse_iso_datetime
+                        try:
+                            final_session_start_at = parse_iso_datetime(data["session_start_at"])
+                        except Exception:
+                            pass
 
-                if quota_text is not None:
-                    data["quota_text"] = quota_text
-                if quota_percent_left is not None:
-                    data["quota_percent_left"] = quota_percent_left
-                
-                if is_expired is not None:
-                    data["is_expired"] = is_expired
-                
-                effective_is_expired = data.get("is_expired", False)
-                
-                data["updated_at"] = datetime.now().astimezone().isoformat()
-                if not dry_run:
-                    metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-                    console.print(
-                        f"Updated local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]"
-                    )
-                else:
-                    console.print(f"Would update local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]")
-            except Exception as exc:
-                console.print(f"[yellow]Warning:[/] Failed to patch local metadata: {exc}")
-                effective_is_expired = is_expired if is_expired is not None else False
+                    if quota_text is not None:
+                        data["quota_text"] = quota_text
+                    if quota_percent_left is not None:
+                        data["quota_percent_left"] = quota_percent_left
+                    
+                    data["is_expired"] = effective_is_expired
+                    
+                    data["updated_at"] = datetime.now().astimezone().isoformat()
+                    if not dry_run:
+                        metadata_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                        console.print(
+                            f"Updated local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]"
+                        )
+                    else:
+                        console.print(f"Would update local metadata for [cyan]{email}[/]: [dim]{metadata_path.name}[/]")
+                except Exception as exc:
+                    console.print(f"[yellow]Warning:[/] Failed to patch local metadata for [dim]{metadata_path.name}[/]: {exc}")
         else:
             now = datetime.now().astimezone()
             final_reset_at = reset_at or now
@@ -159,6 +195,7 @@ def patch_metadata(
         access_token_expires_at=jwt_details.get("access_token_expires_at"),
         auth_expires_at=jwt_details.get("auth_expires_at"),
         auth_provider=jwt_details.get("auth_provider"),
+        has_refresh_token=jwt_details.get("has_refresh_token"),
     )
 
     if args and getattr(args, "cloud", False):
@@ -237,20 +274,44 @@ def sync_current_account_status(args: Any) -> None:
             )
             return
         now = datetime.now().astimezone()
-        session_start_at = now
-        reset_at = now + timedelta(days=7)
 
-        console.print(f"[yellow]Note:[/] Bypassing status check for [cyan]{current_email}[/].")
-        console.print(
-            "[yellow]Assuming exhaustion:[/] Next reset estimated for "
-            f"[bright_magenta]{reset_at.strftime('%Y-%m-%d %H:%M:%S')}[/]"
-        )
+        # Preserve active registry future cooldown if available
+        from .registry import get_registry_entry
+        reg_entry = get_registry_entry(current_email)
+        reg_reset_at = None
+        if reg_entry and "reset_at" in reg_entry:
+            from .cooldown import parse_iso_datetime
+            try:
+                reg_reset_at = parse_iso_datetime(reg_entry["reset_at"])
+            except Exception:
+                pass
+
+        if reg_reset_at and reg_reset_at > now:
+            reset_at = reg_reset_at
+            session_start_at = parse_iso_datetime(reg_entry.get("session_start_at", now))
+            quota_text = reg_entry.get("quota_text") or "Status capture bypassed via --without-status-check. Preserved from active registry."
+            quota_percent_left = reg_entry.get("quota_percent_left")
+            console.print(f"[yellow]Note:[/] Bypassing status check for [cyan]{current_email}[/].")
+            console.print(
+                "[yellow]Preserved active registry reset time:[/] Next reset on "
+                f"[bright_magenta]{reset_at.strftime('%Y-%m-%d %H:%M:%S')}[/]"
+            )
+        else:
+            session_start_at = now
+            reset_at = now + timedelta(days=7)
+            quota_text = "Status capture bypassed via --without-status-check. Estimated +7 days cooldown."
+            quota_percent_left = None
+            console.print(f"[yellow]Note:[/] Bypassing status check for [cyan]{current_email}[/].")
+            console.print(
+                "[yellow]Assuming exhaustion:[/] Next reset estimated for "
+                f"[bright_magenta]{reset_at.strftime('%Y-%m-%d %H:%M:%S')}[/]"
+            )
 
         patch_metadata(
             email=current_email,
             reset_at=reset_at,
-            quota_text="Status capture bypassed via --without-status-check. Estimated +7 days cooldown.",
-            quota_percent_left=None,
+            quota_text=quota_text,
+            quota_percent_left=quota_percent_left,
             args=args,
             session_start_at=session_start_at,
             is_expired=None,
@@ -273,6 +334,7 @@ def sync_current_account_status(args: Any) -> None:
                 break
         except TokenExpiredError as exc:
             console.print(f"[bold red]Error:[/] {exc}")
+            args.status_confirmed_expired = True
             # Try to at least get the email from the error output
             try:
                 from .status import parse_live_status_text
@@ -309,7 +371,9 @@ def sync_current_account_status(args: Any) -> None:
                         "[bold red]Error:[/] Could not identify current account from live status or auth.json."
                     )
                     console.print("[dim]Use --without-status-check only when auth.json contains the active email.[/]")
-            sys.exit(1)
+            if getattr(args, "command", None) == "status":
+                sys.exit(1)
+            return
         except Exception as exc:
             if attempt == 1:
                 console.print(f"[yellow]Status capture failed (attempt 1): {exc}. Try one more time...[/]")
@@ -324,7 +388,9 @@ def sync_current_account_status(args: Any) -> None:
                 console.print("[dim]This will safely assume a 7-day cooldown for the current account.[/]")
                 sys.exit(1)
 
+
     if text:
+        args.captured_status_text = text
         try:
             from .status import parse_live_status_text
             status = parse_live_status_text(
@@ -333,7 +399,7 @@ def sync_current_account_status(args: Any) -> None:
             )
             identified_email = status.email or current_email
             if not identified_email:
-                 raise ValueError("Could not identify account email from status or auth.json")
+                  raise ValueError("Could not identify account email from status or auth.json")
 
             patch_metadata(
                 email=identified_email,
