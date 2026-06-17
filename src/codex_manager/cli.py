@@ -531,9 +531,14 @@ def handle_sync(args: Any) -> None:
 
 
 def main() -> None:
+    import sys
     from .config import load_config
 
     load_config()
+
+    if "--json" not in sys.argv:
+        from .banner import print_logo
+        print_logo()
 
     parser = get_parser()
     args = parser.parse_args()

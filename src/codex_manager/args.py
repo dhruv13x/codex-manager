@@ -22,10 +22,7 @@ class RichHelpParser(argparse.ArgumentParser):
         sys.exit(2)
 
     def print_help(self, file=None):
-        # Header
-        console.print(Panel("[bold bright_cyan]Codex Manager[/]\n[italic bright_green]Account snapshot and quota manager for OpenAI Codex[/]", expand=False, border_style="bright_cyan"))
-        
-        console.print(f"\n[bold bright_white]Usage:[/ ] [dim]{self.format_usage().strip().replace('usage: ', '')}[/]")
+        console.print(f"[bold bright_white]Usage:[/ ] [dim]{self.format_usage().strip().replace('usage: ', '')}[/]")
 
         if self.description:
             console.print(f"\n[italic bright_white]{self.description}[/]")

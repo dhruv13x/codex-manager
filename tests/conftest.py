@@ -26,3 +26,16 @@ def pytest_unconfigure(config):
         shutil.rmtree(TEST_HOME, ignore_errors=True)
     if TEST_CODEX.exists():
         shutil.rmtree(TEST_CODEX, ignore_errors=True)
+
+
+import pytest
+from unittest.mock import patch
+
+@pytest.fixture(autouse=True)
+def mock_banner(request):
+    if "test_banner" in request.node.nodeid:
+        yield
+    else:
+        with patch("codex_manager.banner.print_logo", return_value=None):
+            yield
+
